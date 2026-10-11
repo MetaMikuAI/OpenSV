@@ -49,14 +49,15 @@ def read_wav(path, sample_rate):
     return torch.from_numpy(result)
 
 
-class AudioObjective:
+class AudioObjective(torch.nn.Module):
     def __init__(self, model, path):
+        super().__init__()
         features = next(n for n in model.nodes if n.type in ("_ftmfv2", "_ftmfv3"))
         self.normalizer = Normalizer(features.children[5])
         self.vocoder = Vocoder(Model.read(path).root)
         self.signature = digest(path)
 
-    def __call__(self, prediction, target):
+    def forward(self, prediction, target):
         log_f0, waveform = target
         audio = self.vocoder(decode(self.normalizer, prediction, log_f0))
         if audio.shape != waveform.shape:

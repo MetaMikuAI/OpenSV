@@ -1,4 +1,5 @@
 mod capture;
+mod conditioning;
 mod training;
 
 use anyhow::{Result, ensure};
@@ -101,6 +102,7 @@ enum Command {
 }
 #[derive(Subcommand)]
 enum DatasetCommand {
+    Condition(conditioning::Args),
     Capture(training::CaptureArgs),
     Check {
         #[arg(long)]
@@ -153,6 +155,9 @@ struct Phone {
 }
 fn main() -> Result<()> {
     match Cli::parse().command {
+        Command::Dataset {
+            command: DatasetCommand::Condition(args),
+        } => conditioning::run(args)?,
         Command::TrainComponents(args) => training::components(args)?,
         Command::Dataset {
             command: DatasetCommand::Capture(args),

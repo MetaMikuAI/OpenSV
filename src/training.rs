@@ -22,6 +22,8 @@ pub struct TrainArgs {
     seconds: u32,
     #[arg(long, default_value_t = 4)]
     threads: u32,
+    #[arg(long, default_value = "cpu", value_parser = ["cpu", "cuda"])]
+    device: String,
     #[arg(long, default_value_t = 25)]
     save_every: u32,
     #[arg(long)]
@@ -63,6 +65,8 @@ pub fn run(args: TrainArgs) -> Result<()> {
         .arg(args.seconds.to_string())
         .arg("--threads")
         .arg(args.threads.to_string())
+        .arg("--device")
+        .arg(args.device)
         .arg("--save-every")
         .arg(args.save_every.to_string())
         .arg("--seed")

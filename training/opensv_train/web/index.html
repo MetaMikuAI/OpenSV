@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenSV · 训练</title>
+<style>
+:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;color:#253b37;background:#f4f6f3;font-size:13px}
+*{box-sizing:border-box}body{margin:0}main{max-width:1240px;margin:20px auto;padding:0 20px}
+header,.header-tools{display:flex;justify-content:space-between;align-items:center;gap:10px}header{margin-bottom:16px}
+h1{font-size:25px;letter-spacing:-1px;margin:0}h1 span{font-weight:400;color:#7b8981}
+.badge{border:1px solid #cedcd1;border-radius:20px;padding:6px 10px;font-size:12px;white-space:nowrap}.header-tools select{width:auto;margin:0}
+.layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
+.card{background:white;border:1px solid #e0e7df;border-radius:12px;padding:16px;margin-bottom:12px}aside .card{position:sticky;top:16px}
+h2{font-size:15px;margin:0 0 12px}h2 b{color:#829c88;margin-right:9px;font-size:12px}
+label{display:block;color:#596b61;font-size:12px;margin-bottom:10px;min-width:0}
+input,select{display:block;width:100%;padding:7px 9px;border:1px solid #dce4dc;border-radius:7px;background:#fcfdfb;color:#253b37;margin-top:5px;font:inherit;font-size:13px}
+input:focus,select:focus,button:focus-visible{outline:2px solid #9ebaad;outline-offset:1px}input[type=range]{padding:0;accent-color:#527e65}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.pair{padding:10px;background:#f7f9f6;border:1px solid #e2e9e1;border-radius:8px;margin-bottom:8px}.pair label{margin:0}
+.pair-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px}.pair-head strong{margin-right:auto}.pair-head button{padding:5px 9px;font-size:12px}
+.offset{display:flex;align-items:center;gap:4px;white-space:nowrap}.offset input{width:76px;margin:0;padding:5px 6px}
+button{cursor:pointer;border:0;border-radius:7px;padding:9px 12px;font:inherit;background:#eaf0e9;color:#375646}button.primary{background:#355e4e;color:white}button:disabled{opacity:.5;cursor:default}
+.actions{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0;background:#f4f6f3;position:sticky;bottom:0;z-index:1}
+.hint,.footer{font-size:12px;line-height:1.6;color:#748179}.hint{margin:6px 0 10px}.footer{margin:8px 0}.quiet{font-size:11px;color:#829287}
+details{margin-top:10px}summary{cursor:pointer;font-size:12px;color:#748179}.engine-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}.engine-row label{margin:0}.engine-row button{height:32px}#engine-status{margin:6px 0 10px}
+.status{font-size:21px;margin:6px 0 10px}progress{width:100%;height:6px;accent-color:#527e65}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.metric{padding:10px 0;border-bottom:1px solid #eef0eb}.metric span{color:#748179}.metric strong{display:block;margin-top:4px;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
+.chart{width:100%;height:170px;margin:10px 0 0;border-radius:8px;background:#f7f9f6}.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;margin:6px 0 10px}.legend span:first-child{color:#3c8365}.legend span:last-child{color:#b97e3e}
+pre{white-space:pre-wrap;overflow:auto;max-height:220px;font-size:11px;color:#718079;line-height:1.6}#error{color:#a13e39;white-space:pre-wrap}#artifacts{font-size:12px;overflow-wrap:anywhere;line-height:1.8}audio{width:100%;margin-top:12px}
+.help{display:inline-block;margin-left:4px;color:#748179;cursor:help;font-size:11px;border:1px solid #cedcd1;border-radius:50%;width:15px;height:15px;text-align:center;line-height:13px;flex-shrink:0}
+.blessing{border-top:1px solid #eef0eb;padding-top:10px}.blessing figure{margin:12px 0 0;text-align:center}.blessing pre{display:inline-block;max-width:100%;max-height:none;margin:0;white-space:pre;text-align:left;font-family:Consolas,"Courier New",monospace;font-size:14px;line-height:1.2;color:#9a8251}.blessing figcaption{margin-top:8px;font-size:12px;color:#8a7857}
+fieldset{border:0;padding:0;margin:0;min-width:0}[hidden]{display:none!important}
+@media(max-width:780px){main{margin:16px auto;padding:0 12px}.layout{grid-template-columns:1fr}aside .card{position:static}}
+@media(max-width:480px){.row{grid-template-columns:1fr}.pair-head{flex-wrap:wrap}.badge{display:none}.card{padding:12px}}
+</style>
+<main>
+<header><h1>OpenSV <span>/ 训练</span></h1><div class="header-tools"><span class="badge">本地运行</span><select id="ui-language" aria-label="Interface language"><option value="zh">中文</option><option value="en">English</option></select></div></header>
+<div class="layout">
+<form id="form">
+<fieldset id="inputs">
+<section class="card"><h2><b>01</b>训练材料</h2>
+<label>数据来源<select id="mode" name="mode"><option value="pair">干声 WAV ＋ SVP／VSQX 工程</option><option value="dataset">已有干声数据集</option></select></label>
+<label>底模声库<input name="voice" placeholder="已解码 NOFS 文件或模型目录" required></label>
+<div id="pair-fields">
+<div id="pairs"></div><button type="button" id="add-pair">＋ 添加一组材料</button>
+<p class="hint">每组材料对应同一段演唱，自动切分与划分训练／验证集。音频偏移通常保持 0。</p></div>
+<div id="dataset-fields" hidden><label>数据集清单<input name="dataset" placeholder="dataset.json"></label><p class="hint">选择此前生成的清单，同目录需有底模与声码器。</p></div>
+<label>工作目录<input name="output" placeholder="新建目录；续训时填写之前的工作目录" required></label>
+</section>
+<section class="card"><h2><b>02</b>训练设置</h2>
+<div class="row"><div><label id="epochs-field">累计训练轮数<input name="epochs" type="number" min="0.000001" max="10000000" step="any" value="2" required></label><label id="steps-field" hidden>累计训练步数<input name="steps" type="number" min="1" max="10000000" value="100"></label></div><label>本次时间上限（秒）<input name="seconds" type="number" min="1" max="604800" value="1800" required></label></div>
+<p id="training-target" class="hint">检查切分后，将按训练片段数换算总步数。</p>
+<p class="hint">训练声学网络；时长、自动音高和声码器保持固定。时间限制不包含数据准备与导出。</p>
+<div class="row"><label>试听工程（选填）<input name="preview" placeholder="使用未参与训练的 song.svp"></label><label>试听语言<select name="preview_language"><option value="">跟随材料语言</option><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label></div>
+<div class="row"><label>材料语言<select name="language"><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label><label>训练设备<select name="device"><option value="cpu">CPU</option><option value="cuda" disabled>NVIDIA GPU（CUDA）</option></select></label></div>
+<p id="device-status" class="hint">正在检测训练设备…</p>
+<div class="row"><label>学习率<input name="lr" type="number" step="any" value="0.000001" min="0.000000001" max="1"><input id="lr-slider" aria-label="学习率滑条" type="range" min="-7" max="-3" step="0.1" value="-6"><span class="quiet">0.0000001 — 0.001，可直接输入数值</span></label><label>CPU 线程<input name="threads" type="number" min="1" max="256" value="4"></label></div>
+<details><summary>高级设置</summary>
+<div class="row"><label>训练目标单位<select id="training-unit"><option value="epochs">轮数</option><option value="steps">步数</option></select></label><label>批次大小<input value="1" disabled title="当前每一步训练一个片段，批次大小固定为 1。"></label></div>
+</details>
+<details open><summary>引擎与发音词典</summary>
+<div class="engine-row"><label>OpenSV 引擎<input name="engine" placeholder="编译好的 opensv 程序路径" required></label><button type="button" id="check-engine">检查引擎</button></div>
+<p class="hint" id="engine-status">需要已编译的 OpenSV 引擎；可使用现有程序，或从源码构建。</p>
+<div class="row"><label>发音词典<input name="dictionary" placeholder="clf-data 目录或自定义 JSON 文件"></label><label>试听词典（选填）<input name="preview_dictionary" placeholder="留空沿用材料词典"></label></div>
+</details></section>
+</fieldset>
+<label id="confirmation"><input id="confirm" type="checkbox" style="display:inline;width:auto;margin-right:6px">我已查看切分与对齐提示，并确认材料对应。</label>
+<div class="actions"><button type="button" id="prepare">检查并切分</button><button class="primary" id="start">开始训练</button><button type="button" id="resume">从工作目录续训</button><button type="button" id="stop" disabled>保存并停止</button></div>
+<p class="footer">续训填写累计目标轮数或步数，沿用原材料与其他设置。</p>
+</form>
+<aside><section class="card"><h2><b>03</b>进度与结果</h2><div class="status" id="status">准备就绪</div><progress id="progress" max="100" value="0"></progress>
+<div class="metrics"><div class="metric"><span>已完成轮数</span><strong id="epoch">—</strong><small id="step">—</small></div>
+<div class="metric"><span>训练误差 · 最近 20 步平均</span><strong id="train-loss">—</strong></div>
+<div class="metric"><span>验证误差</span><strong id="loss">—</strong></div>
+<div class="metric"><span>最优检查点</span><strong id="best">—</strong></div></div>
+<svg id="chart" class="chart" viewBox="0 0 480 190" role="img" aria-label="训练与验证误差曲线"></svg><div class="legend"><span>● 训练误差 · 20 步平均</span><span>● 验证误差 · 检查点</span></div>
+<p class="hint">平均值用于观察趋势，不足 20 步时按已有记录计算。原始逐步误差保留在日志中。</p>
+<p class="hint">每秒刷新。验证在每 25 步及结束时执行；导出验证误差最低的模型。</p>
+<p id="error" role="alert"></p><div id="review" style="font-size:12px;white-space:pre-wrap;line-height:1.8"></div><select id="segments" aria-label="切分试听" hidden></select><div id="artifacts"></div><audio id="audio" controls hidden></audio>
+<details><summary>运行日志</summary><pre id="logs"></pre></details>
+<details class="blessing" open><summary>赛博佛祖</summary><figure><pre aria-hidden="true">
+                  _oo0oo_
+                 o8888888o
+                 88" . "88
+                 (| -_- |)
+                 0\  =  /0
+               ___/`---'\___
+             .' \\|     |// '.
+            / \\|||  :  |||// \
+           / _||||| -:- |||||- \
+          |   | \\\  -  /// |   |
+          | \_|  ''\---/''  |_/ |
+          \  .-\__  '-'  ___/-. /
+        ___'. .'  /--.--\  `. .'___
+     ."" '&lt;  `.___\_&lt;|&gt;_/___.' &gt;' "".
+    | | :  `- \`.;`\ _ /`;.`/ - ` : | |
+    \  \ `_.   \_ __\ /__ _/   .-` /  /
+=====`-.____`.___ \_____/___.-`___.-'=====
+                  `=---='
+</pre><figcaption>佛祖保佑，梯度不炸，Loss 下降。</figcaption></figure></details></section>
+<p class="footer">关闭网页不会停止任务。停止训练后，终端可用 Ctrl+C 退出服务。</p>
+</aside></div></main>
+<template id="pair-template"><div class="pair"><div class="pair-head"><strong></strong><label class="offset">音频偏移（秒）<input data-key="offset" type="number" step="any" value="0"></label><button type="button" class="remove-pair">移除</button></div><div class="row"><label>干声 WAV<input data-key="audio" placeholder="完整单人干声 WAV 的路径"></label><label>对应工程<input data-key="project" placeholder="与这段声音对应的 SVP／VSQX 路径"></label></div></div></template>
+<script>
+const translations={
+'/ 训练':'/ Training','本地运行 · CPU':'Local · CPU','训练材料':'Training materials','数据来源':'Data source','干声 WAV ＋ SVP／VSQX 工程':'Dry WAV + SVP / VSQX score','已有干声数据集':'Prepared dry-audio dataset','底模声库':'Base voice','已解码 NOFS 文件或模型目录':'Decoded NOFS file or model directory','＋ 添加一组材料':'+ Add pair','每组材料对应同一段演唱，自动切分与划分训练／验证集。音频偏移通常保持 0。':'Each pair describes the same performance. Clips and train/validation splits are generated automatically. Usually leave the offset at 0.','数据集清单':'Dataset manifest','选择此前生成的清单，同目录需有底模与声码器。':'Use a prepared manifest with its base model and vocoder in the same directory.','工作目录':'Working directory','新建目录；续训时填写之前的工作目录':'New directory, or the previous directory to resume','训练设置':'Training settings','累计训练步数':'Total training steps','本次时间上限（秒）':'Time limit this run (s)','训练声学网络；时长、自动音高和声码器保持固定。时间限制不包含数据准备与导出。':'Trains the acoustic network. Duration, pitch and vocoder stay fixed. Preparation and export are outside the time limit.','试听工程（选填）':'Preview score (optional)','使用未参与训练的 song.svp':'An SVP score not used for training','材料语言':'Material language','中文（普通话）':'Chinese (Mandarin)','日语':'Japanese','学习率':'Learning rate','学习率滑条':'Learning rate slider','0.0000001 — 0.001，可直接输入数值':'0.0000001 — 0.001, or enter a value','CPU 线程':'CPU threads','引擎与发音词典':'Engine and pronunciation dictionary','OpenSV 引擎':'OpenSV engine','编译好的 opensv 程序路径':'Path to the compiled opensv executable','检查引擎':'Check engine','需要已编译的 OpenSV 引擎；可使用现有程序，或从源码构建。':'Requires a compiled OpenSV engine. Use an existing executable or build from source.','发音词典目录':'Pronunciation dictionary directory','clf-data；工程已有显式音素时可留空':'clf-data; optional when the score includes explicit phonemes','我已查看切分与对齐提示，并确认材料对应。':'I reviewed the segmentation and alignment messages and confirmed the pairs.','检查并切分':'Check and split','开始训练':'Start training','从工作目录续训':'Resume training','保存并停止':'Save and stop','续训沿用工作目录内的材料与设置，仅更新累计步数和本次时限。':'Resuming reuses saved materials and settings, updating only total steps and this run’s time limit.','进度与结果':'Progress and results','准备就绪':'Ready','已完成步数':'Completed steps','当前训练误差':'Training loss','验证误差':'Validation loss','最优检查点':'Best checkpoint','训练与验证误差曲线':'Training and validation loss','● 训练误差 · 每步':'● Training · each step','● 验证误差 · 检查点':'● Validation · checkpoints','每秒刷新。验证在每 25 步及结束时执行；导出验证误差最低的模型。':'Updates every second. Validates every 25 steps and at completion. Exports the model with the lowest validation loss.','切分试听':'Preview clips','运行日志':'Run log','关闭网页不会停止任务。停止训练后，终端可用 Ctrl+C 退出服务。':'Closing this page does not stop the task. After stopping training, use Ctrl+C in the terminal to exit.','移除':'Remove','干声 WAV':'Dry WAV','完整单人干声 WAV 的路径':'Path to the full solo dry WAV','对应工程':'Matching score','与这段声音对应的 SVP／VSQX 路径':'Path to the matching SVP / VSQX score','音频偏移（秒）':'Audio offset (s)','准备材料':'Preparing materials','检查与切分':'Checking and splitting','请检查切分结果':'Review the prepared clips','正在训练':'Training','导出声库':'Exporting voice','渲染试听':'Rendering preview','训练完成':'Training complete','已保存进度':'Progress saved','任务未完成':'Task failed','等待保存进度…':'Waiting to save progress…','正在检查…':'Checking…','开始训练后显示误差曲线':'Loss curves appear when training starts','试听读取失败':'Could not load preview audio'
+};
+const help={
+voice:['选择用于微调的已解码 NOFS 文件，或包含 base_model.dnni 的模型目录。不是 SVP 工程文件。','Select a decoded NOFS voice or a model directory containing base_model.dnni for fine-tuning, not an SVP score.'],
+engine:['选择编译好的 opensv.exe（其他系统为 opensv），然后点击检查引擎。不是 Python 程序。','Select the compiled opensv.exe (opensv on other systems), then check the engine. This is not the Python executable.'],
+dictionary:['选择 clf-data 目录或自定义 JSON 词典文件；用户词条覆盖基础词典。工程已有显式音素时可留空。','Select a clf-data directory or a custom JSON dictionary file. Custom entries override the base dictionary. Leave blank if the score supplies explicit phonemes.'],
+preview_dictionary:['仅用于试听；可选 clf-data 目录或自定义 JSON，不改变已准备的训练材料。','Used only for previews. Accepts a clf-data directory or custom JSON file without changing the prepared training materials.'],
+output:['保存切分数据、训练进度和导出声库。新任务使用新目录，续训选择原工作目录。','Stores clips, checkpoints and exported voices. Use a new directory for a new run, or the original directory to resume.'],
+audio:['与工程对应的单人干声，不加混响或伴奏。保留从工程零点开始的静音；所有材料使用同一个目标声音。','Solo dry audio matching the score, without reverb or accompaniment. Preserve silence from time zero. Use the same target voice for all pairs.'],
+project:['选择与 WAV 对应的 SVP 或 VSQX。只接受一个有音符的有效歌声轨道。','Select the SVP or VSQX matching the WAV. Only one active vocal track with notes is accepted.'],
+offset:['默认 0。WAV 中声音比工程晚 1 秒填 1；若删去开头 1 秒则填 -1。只修正时间对齐，不改变音高或速度。','Default: 0. Enter 1 if audio occurs one second later than the score, or -1 if one second was trimmed from the beginning. Adjusts alignment, not pitch or speed.'],
+lr:['控制每一步更新参数的幅度。滑条采用对数刻度，也可直接输入数值。','Controls the size of each parameter update. The slider uses a logarithmic scale; you can also enter a value.'],
+language:['训练材料中歌词和发音的语言，与试听语言及右上角的界面语言独立。','Language of lyrics and pronunciation in the training materials, independent of the preview and interface languages.'],
+dataset:['选择之前检查切分生成的 dataset.json，无需手写。首次使用请改选干声与工程。','Select a dataset.json generated by a previous preparation run. No manual manifest is needed; first-time users can select dry audio and scores.'],
+steps:['累计目标步数。续训到 200 步时填 200，而不是本次新增的步数。','Total target steps. To resume up to step 200, enter 200, not the number of additional steps.'],
+epochs:['完整学习一遍训练材料就是一轮。续训时填写累计目标，例如从 2 轮继续到 5 轮，填 5。','One epoch is one pass through all training clips. Enter the cumulative target when resuming: to continue from 2 to 5 epochs, enter 5.'],
+seconds:['限制训练进程的本次运行时间，每步结束后检查并保存；数据切分和声库导出另计。','Limits the training process this run. The limit is checked between steps and progress is saved; data preparation and voice export are separate.'],
+threads:['CPU 运算使用的线程数。GPU 训练仍有部分数据处理在 CPU 上完成。','Threads for CPU operations. GPU training still uses the CPU for some data processing.'],
+device:['默认使用 CPU。NVIDIA GPU 需要支持 CUDA 的 PyTorch 与显卡驱动；数据准备和声库导出仍使用 CPU。','CPU is the default. NVIDIA GPU training requires CUDA-enabled PyTorch and a compatible driver. Preparation and voice export still use the CPU.'],
+preview:['可选的独立 SVP 工程，训练结束后用导出的声库渲染试听。','Optional independent SVP score, rendered with the exported voice after training.'],
+preview_language:['仅用于试听，不改变训练材料语言。日语汉字读音不能自动猜测，可用自定义词典或显式音素指定。','Used only for previews; does not change the training material language. Japanese kanji readings are not inferred automatically; specify them with a custom dictionary or explicit phonemes.']
+};
+for(const [zh,en] of Object.values(help))translations[zh]=en;
+Object.assign(translations,{
+'发音词典':'Pronunciation dictionary','clf-data 目录或自定义 JSON 文件':'clf-data directory or custom JSON file',
+'试听词典（选填）':'Preview dictionary (optional)','留空沿用材料词典':'Leave blank to use the material dictionary',
+'试听语言':'Preview language','跟随材料语言':'Use material language',
+'试听语言必须为中文或日语，或跟随材料语言':'Preview language must be Mandarin, Japanese, or the material language.',
+'赛博佛祖':'Cyber Buddha','佛祖保佑，梯度不炸，Loss 下降。':'May Buddha bless our gradients and keep the loss going down.',
+'本地运行':'Local','训练设备':'Training device','NVIDIA GPU（CUDA）':'NVIDIA GPU (CUDA)','正在检测训练设备…':'Checking training devices…',
+'CPU 与 NVIDIA GPU 均可选。':'CPU and NVIDIA GPU are available.',
+'当前 PyTorch 仅支持 CPU，请先安装支持 CUDA 的 PyTorch':'This PyTorch build is CPU-only. Install a CUDA-enabled build first.',
+'未检测到可用的 NVIDIA GPU 或驱动':'No usable NVIDIA GPU or driver was detected.',
+'PyTorch 加载失败，请检查训练环境':'Could not load PyTorch. Check the training environment.',
+'显存不足。请关闭占用显卡的程序、缩短音频片段，或选择 CPU。':'GPU memory is insufficient. Close other GPU applications, use shorter audio segments, or choose CPU.',
+'CUDA 不可用。请安装 CUDA 版 PyTorch 并检查 NVIDIA 驱动，或选择 CPU。':'CUDA is unavailable. Install a CUDA-enabled PyTorch build and check the NVIDIA driver, or choose CPU.',
+'训练设备必须为 cpu 或 cuda':'Training device must be cpu or cuda.',
+'训练轮数必须为大于 0 的有限数值':'Training epochs must be a finite number greater than 0.',
+'数据集中没有训练片段':'The dataset contains no training clips.',
+'缺少数据集清单，请先完成检查并切分':'Dataset manifest missing. Complete Check and split first.',
+'数据集清单格式无效':'Invalid dataset manifest.',
+'训练目标不能超过 10000000 步，请减少训练轮数':'The target exceeds 10,000,000 steps. Reduce the number of epochs.',
+'累计训练轮数':'Total training epochs','已完成轮数':'Completed epochs',
+'训练误差 · 最近 20 步平均':'Training loss · last 20 steps',
+'● 训练误差 · 20 步平均':'● Training · 20-step average',
+'平均值用于观察趋势，不足 20 步时按已有记录计算。原始逐步误差保留在日志中。':'The average shows the trend, using available records until 20 steps are reached. Raw per-step loss remains in the log.',
+'检查切分后，将按训练片段数换算总步数。':'After preparation, total steps are calculated from the number of training clips.',
+'高级设置':'Advanced settings','训练目标单位':'Training target unit','轮数':'Epochs','步数':'Steps','批次大小':'Batch size',
+'当前每一步训练一个片段，批次大小固定为 1。':'Each step trains on one clip. Batch size is currently fixed at 1.',
+'续训填写累计目标轮数或步数，沿用原材料与其他设置。':'Resume with a cumulative epoch or step target, keeping the original materials and other settings.',
+'请先点击「检查并切分」，完成后确认对齐，再开始训练':'Click Check and split first, then review the alignment and confirm before starting training.',
+'工作目录中没有可续训记录，请选择之前训练使用的工作目录':'No training record was found. Select the working directory from your previous training run.',
+'工作目录已存在，请选择新的工作目录；已有训练记录请使用续训':'The working directory already exists. Choose a new directory, or use Resume training for an existing run.',
+'工程只有歌词，缺少发音词典。请展开「引擎与发音词典」并填写词典目录，再检查切分。':'The score contains lyrics without explicit phonemes. Open Engine and pronunciation dictionary, fill in Pronunciation dictionary with a directory or JSON file, then check and split again.',
+'工程只有歌词，缺少发音词典。请展开「引擎与发音词典」并填写词典目录或 JSON 文件，再检查切分。':'The score contains lyrics without explicit phonemes. Open Engine and pronunciation dictionary, enter a dictionary directory or JSON file, then check and split again.',
+'引擎可用，支持训练数据准备':'Engine ready; training data preparation is supported.',
+'未找到引擎，请填写编译好的 opensv 程序路径':'Engine not found. Enter the path to the compiled opensv executable.',
+'该引擎不支持当前数据准备接口，请更新 OpenSV 引擎':'This engine does not support the data preparation interface. Update OpenSV.',
+'数据来源无效':'Invalid data source.','请选择工作目录':'Select a working directory.',
+'音频偏移必须在 -600 到 600 秒之间':'Audio offset must be between -600 and 600 seconds.',
+'材料偏移必须在 -600 到 600 秒之间':'Pair offset must be between -600 and 600 seconds.',
+'请提供 1–100 组材料':'Provide 1–100 material pairs.','请提供 1–100 组对应材料':'Provide 1–100 matching material pairs.',
+'学习率必须大于 0 且不超过 1':'Learning rate must be greater than 0 and no greater than 1.',
+'已有任务运行中':'A task is already running.','检查切分需要干声与对应工程':'Provide dry audio and its matching score to check and split.',
+'工作目录中没有可续训的 latest.pt':'No latest.pt checkpoint was found in the working directory.',
+'材料已修改，请使用新工作目录重新检查切分':'Materials have changed. Use a new working directory and check and split again.',
+'材料检查未通过，请修正后重新导入':'Material checks failed. Correct the issues and import again.',
+'请先查看切分结果，并确认已检查对齐提示':'Review the clips and confirm that you checked the alignment messages.',
+'该目录已有训练记录，请使用续训':'This directory already contains a training run. Use Resume training.',
+'找不到 opensv 程序，请先 cargo build --release':'OpenSV executable not found. Build it with cargo build --release.',
+'界面仅接受 audio 干声数据集':'This interface accepts only dry-audio datasets with audio supervision.',
+'拒绝访问':'Access denied.','片段不存在':'Clip not found.','不存在':'Not found.',
+'请求大小无效':'Invalid request size.','请求必须为对象':'Request must be an object.',
+'WAV 采样率、通道或长度不支持（最长 11 分钟）':'Unsupported WAV sample rate, channels or duration (maximum 11 minutes).',
+'WAV 编码不支持':'Unsupported WAV encoding.','WAV 为空或包含无效采样':'WAV is empty or contains invalid samples.',
+'音频接近或超过满幅，请检查削波。':'Audio is near or above full scale. Check for clipping.',
+'只支持单声道或双声道 WAV':'Only mono or stereo WAV is supported.',
+'左右声道不同，已取平均；请确认没有伴奏、混响或叠唱。':'Stereo channels differ and have been averaged. Check for accompaniment, reverb or layered vocals.',
+'音频基本静音，无法训练':'Audio is nearly silent and cannot be used for training.',
+'工程音符超出 WAV 时间范围，请检查导出起点、尾部或音频偏移。':'Score notes fall outside the WAV duration. Check the export start, ending and audio offset.',
+'音符与有声区明显不匹配，修正后再导入。':'Notes and voiced regions do not match. Correct the alignment and import again.',
+'音频偏移无效':'Invalid audio offset.',
+'音素边界由底模根据歌词与音符估计，尚未进行逐音素强制对齐；请试听切片。':'Phoneme boundaries are estimated by the base model from lyrics and notes, without forced alignment. Please preview the clips.',
+'训练与验证交界处的重叠片段已跳过，避免重复音频。':'Overlapping clips at the train/validation boundary were skipped to avoid duplicate audio.',
+'独立片段不足，至少需要两个不重叠的有效片段；请提供更长或含停顿的材料。':'At least two valid, non-overlapping clips are required. Provide longer material or material with pauses.',
+'重复的源 WAV，请移除重复材料。':'Duplicate source WAV. Remove the duplicate material.',
+'多组材料按来源划分训练与验证，最后约 20% 的材料用于验证。':'Pairs are split by source; approximately the last 20% are used for validation.',
+'训练与验证都需要有效材料。':'Both training and validation require valid material.',
+'只支持 VSQX 3／4 格式':'Only VSQX 3 / 4 formats are supported.',
+'VSQX 拍长或预备小节无效':'Invalid VSQX resolution or pre-measures.','VSQX 拍号无效':'Invalid VSQX time signature.',
+'VSQX 缺少起始速度':'VSQX is missing its initial tempo.','工程需要 SVP 或 VSQX 文件':'Select an SVP or VSQX score.',
+'工程速度表无效':'Invalid score tempo map.',
+'请提供只含一条人声轨的工程与对应干声，不支持多声部混音':'Provide a score with one active vocal track and its dry audio. Polyphonic mixes are not supported.',
+'SVP 含引用组，请先在编辑器中合并到主音符组':'SVP contains referenced groups. Merge them into the main note group in the editor first.',
+'工程存在无效音符':'The score contains invalid notes.',
+'存在无歌词或延音符号，请先补充明确歌词／音素':'Some notes have missing lyrics or sustain symbols. Supply explicit lyrics or phonemes first.',
+'工程中音符重叠，不适合单声部训练':'Score notes overlap and cannot be used for monophonic training.',
+'工程为空或超过当前 10 分钟限制，请拆分工程':'The score is empty or exceeds the current 10-minute limit. Split it into shorter scores.'
+});
+const messagePatterns=[
+[/^声库已导出，试听渲染失败：([\s\S]+)$/,(_,error)=>`Voice exported, but preview rendering failed: ${message(error)}`],
+[/^CUDA 不可用：(.+)$/,(_,reason)=>`CUDA unavailable: ${message(reason)}`],
+[/^材料 (\d+)：(.+)$/,(_,n,rest)=>`Pair ${n}: ${message(rest)}`],
+[/^材料 (\d+) 的 (\w+) 文件不存在$/,(_,n,key)=>`Pair ${n}: ${key} file not found.`],
+[/^材料 (\d+) 含重复音频，请移除重复材料后重新导入。$/,(_,n)=>`Pair ${n} contains duplicate audio. Remove duplicates and import again.`],
+[/^路径不存在：(.+)$/,(_,key)=>`Path does not exist: ${key}`],
+[/^数据集文件不存在：(.+)$/,(_,path)=>`Dataset file not found: ${path}`],
+[/^(\w+) 必须在 (.+) 之间$/,(_,key,range)=>`${key} must be in the range ${range}.`],
+[/^(\w+) 失败，退出码 (\d+)；请查看日志$/,(_,phase,code)=>`${phase} failed with exit code ${code}. See the log.`],
+[/^VSQX 缺少 (.+)$/,(_,name)=>`VSQX is missing ${name}.`],
+[/^仅 (\d+%) 的有声区位于预计音符附近，可能存在整体错位、伴奏或多余片段。$/,(_,n)=>`Only ${n} of voiced audio is near expected notes. Check for an overall offset, accompaniment or extra audio.`],
+[/^预计音符区只有 (\d+%) 检测到声音，请检查缺失片段或时间错位。$/,(_,n)=>`Only ${n} of expected note regions contain audio. Check for missing clips or an offset.`],
+[/^片段 (\d+) 基本静音，已跳过。$/,(_,n)=>`Clip ${n} is nearly silent and was skipped.`],
+[/^片段 (\d+) 音频重复，已跳过。$/,(_,n)=>`Clip ${n} contains duplicate audio and was skipped.`],
+[/^片段 (\d+) 无法提取可靠音高，已跳过。$/,(_,n)=>`Reliable pitch could not be extracted from clip ${n}; it was skipped.`],
+[/^片段 (\d+) 实测音高与音符偏差较大，请检查移调、错位或音高提取。$/,(_,n)=>`Measured pitch differs substantially from notes in clip ${n}. Check transposition, alignment and pitch extraction.`]
+];
+let uiLanguage=localStorage.getItem('opensv-language')==='en'?'en':'zh';
+const reverseTranslations=Object.fromEntries(Object.entries(translations).map(([zh,en])=>[en,zh]));
+function translated(text){const original=reverseTranslations[text]||text;return uiLanguage==='en'?(translations[original]||original):original}
+function message(text){text=reverseTranslations[text]||text;if(uiLanguage!=='en')return text;if(translations[text])return translations[text];for(const[pattern,format]of messagePatterns){const match=text.match(pattern);if(match)return format(...match)}return text}
+function showMessage(id,text){$(id).dataset.message=text;$(id).textContent=message(text)}
+function localize(root=document.querySelector('main')){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);while(walker.nextNode()){const node=walker.currentNode;if(node.parentElement.closest('#logs,#error,#artifacts,#review,#ui-language'))continue;const text=node.textContent.trim(),value=translated(text);if(text!==value)node.textContent=node.textContent.replace(text,value)}for(const el of root.querySelectorAll('[placeholder],[title],[aria-label]'))for(const attr of ['placeholder','title','aria-label'])if(el.hasAttribute(attr))el.setAttribute(attr,translated(el.getAttribute(attr)));document.documentElement.lang=uiLanguage==='en'?'en':'zh-CN';document.title='OpenSV · '+(uiLanguage==='en'?'Training':'训练')}
+function addHelp(root){for(const input of root.querySelectorAll('input,select')){const key=input.name||input.dataset.key;if(!help[key])continue;const label=input.closest('label');if(!label||label.querySelector('.help'))continue;const hint=document.createElement('span');hint.className='help';hint.textContent='?';hint.tabIndex=0;hint.title=translated(help[key][0]);hint.setAttribute('aria-label',hint.title);label.insertBefore(hint,input);input.title=hint.title}}
+const token=location.hash.slice(1)||sessionStorage.getItem('opensv-token')||'';
+sessionStorage.setItem('opensv-token',token);history.replaceState(null,'',location.pathname);
+const $=id=>document.getElementById(id),form=$('form');let lastAudio='',audioUrl='',lastState=null,disconnected=false;
+async function api(path,body){const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{'X-OpenSV-Token':token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const result=await response.json();if(!response.ok)throw Error(result.error);return result}
+function pairValues(){return [...$('pairs').children].map(row=>({project:row.querySelector('[data-key=project]').value,audio:row.querySelector('[data-key=audio]').value,offset:Number(row.querySelector('[data-key=offset]').value)}))}
+function numberPairs(){[...$('pairs').children].forEach((row,i)=>{row.querySelector('strong').textContent=(uiLanguage==='en'?'Pair ':'材料 ')+(i+1);row.querySelector('button').disabled=$('pairs').children.length===1})}
+function addPair(data={}){const row=$('pair-template').content.firstElementChild.cloneNode(true);for(const input of row.querySelectorAll('input'))if(data[input.dataset.key]!==undefined)input.value=data[input.dataset.key];row.querySelector('button').onclick=()=>{row.remove();numberPairs();$('confirm').checked=false};$('pairs').append(row);addHelp(row);localize(row);numberPairs()}
+$('add-pair').onclick=()=>addPair();addPair();
+function values(){const data=Object.fromEntries(new FormData(form));data.epochs=$('training-unit').value==='epochs'?data.epochs:null;data.pairs=pairValues();data.confirm_alignment=$('confirm').checked;return data}
+function setUnit(unit){$('training-unit').value=unit;const epochs=unit==='epochs';$('epochs-field').hidden=!epochs;$('steps-field').hidden=epochs;form.elements.epochs.required=epochs;form.elements.steps.required=!epochs;form.elements.epochs.disabled=!epochs;form.elements.steps.disabled=epochs;updateTarget()}
+function trainCount(){
+const config=lastState?.config;if(!config)return 0;
+if(!lastState.busy&&(form.elements.output.value!==config.output||$('mode').value!==config.mode))return 0;
+if(!lastState.busy&&config.mode==='dataset'&&form.elements.dataset.value!==config.dataset)return 0;
+if(!lastState.busy&&config.mode==='pair'&&JSON.stringify(pairValues())!==JSON.stringify(config.pairs))return 0;
+return Number(config.train_samples||lastState.metrics?.train_samples||lastState.preparation?.train_samples)||0;
+}
+function updateTarget(){
+const count=trainCount(),english=uiLanguage==='en';
+if(!count){showMessage('training-target','检查切分后，将按训练片段数换算总步数。');return}
+const steps=$('training-unit').value==='epochs'?Math.ceil(Number(form.elements.epochs.value)*count):Number(form.elements.steps.value);
+if(!Number.isFinite(steps)||steps<1){$('training-target').textContent='—';return}
+$('training-target').textContent=english?`${count} training clips × ${(steps/count).toFixed(2)} epochs ≈ ${steps} steps · batch size 1`:`${count} 个训练片段 × ${(steps/count).toFixed(2)} 轮 ≈ ${steps} 步 · 批次大小 1`;
+}
+function paint(state){lastState=state;$('inputs').disabled=state.busy;$('start').disabled=state.busy;$('prepare').disabled=state.busy;$('resume').disabled=state.busy;$('stop').disabled=!state.busy||state.stop_requested;
+if(state.busy&&state.config){for(const [key,value] of Object.entries(state.config)){const input=form.elements.namedItem(key);if(input&&value!==null)input.value=value}setUnit(state.config.epochs==null?'steps':'epochs');if(JSON.stringify(pairValues())!==JSON.stringify(state.config.pairs)){$('pairs').replaceChildren();state.config.pairs.forEach(addPair)}$('lr-slider').value=Math.log10(Number(form.elements.lr.value));$('mode').onchange()}
+const names={idle:'准备就绪',starting:'准备材料',preparing:'检查与切分',review:'请检查切分结果',training:'正在训练',export:'导出声库',render:'渲染试听',complete:'训练完成',stopped:'已保存进度',error:'任务未完成'};
+$('status').textContent=state.stop_requested&&state.busy?'等待保存进度…':names[state.phase]||state.phase;
+const e=state.metrics||{},count=Number(state.config?.train_samples||e.train_samples)||0;
+if(e.step!==undefined){const target=state.config?.steps||100;$('step').textContent=uiLanguage==='en'?`${e.step} / ${target} steps`:`${e.step} / ${target} 步`;$('epoch').textContent=count?`${(e.step/count).toFixed(2)} / ${(target/count).toFixed(2)}`:'—';$('progress').max=target;$('progress').value=e.step}
+if(e.loss_average!==undefined)$('train-loss').textContent=Number(e.loss_average).toFixed(5);drawChart(state.history||[]);updateTarget();
+if(e.validation_loss!==undefined)$('loss').textContent=Number(e.validation_loss).toFixed(5);if(e.best_step!==undefined)$('best').textContent=e.best_step;
+$('logs').textContent=(state.logs||[]).join('\n');if(state.error||state.warning)showMessage('error',state.error||state.warning);$('artifacts').textContent=(state.artifacts||[]).join('\n');
+if(state.preparation){const p=state.preparation,english=uiLanguage==='en';
+const summary=english?`Training ${p.train_samples||0} clips · Validation ${p.validation_samples||0} clips · ${(p.seconds||0).toFixed(1)} s`:`训练 ${p.train_samples||0} 段 · 验证 ${p.validation_samples||0} 段 · ${(p.seconds||0).toFixed(1)} 秒`;
+$('review').textContent=[summary,...(p.errors||[]).map(x=>(english?'Error: ':'错误：')+message(x)),...(p.warnings||[]).map(x=>(english?'Note: ':'提示：')+message(x))].join('\n');
+const selected=p.segments.filter(s=>s.split),cacheKey=state.output+uiLanguage;if($('segments').dataset.output!==cacheKey){const previous=$('segments').value;$('segments').replaceChildren(...selected.map(s=>{const option=document.createElement('option');option.value=s.id;option.textContent=`${s.id} · ${s.start.toFixed(2)}–${s.end.toFixed(2)} ${english?'s':'秒'} · ${s.split==='train'?(english?'Training':'训练'):(english?'Validation':'验证')}`;return option}));if(selected.some(s=>s.id===previous))$('segments').value=previous;$('segments').dataset.output=cacheKey}$('segments').hidden=!selected.length;}
+
+if(state.audio&&lastAudio!==state.audio){lastAudio=state.audio;play('/api/audio')}localize()}
+async function play(path){try{const r=await fetch(path,{headers:{'X-OpenSV-Token':token}});if(!r.ok)throw Error('试听读取失败');const b=await r.blob();if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(b);$('audio').src=audioUrl;$('audio').hidden=false}catch(e){showMessage('error',e.message)}}
+async function start(action){try{showMessage('error','');const result=await api(action,values());for(const id of ['epoch','step','train-loss','loss','best'])$(id).textContent='—';$('progress').value=0;$('audio').hidden=true;$('review').textContent='';$('segments').hidden=true;paint(result)}catch(e){showMessage('error',e.message)}}
+form.onsubmit=e=>{e.preventDefault();start('start')};$('prepare').onclick=()=>{$('confirm').checked=false;start('prepare')};$('resume').onclick=()=>start('resume');$('stop').onclick=()=>api('stop',{}).then(paint).catch(e=>showMessage('error',e.message));$('segments').onchange=()=>play('/api/audio?segment='+encodeURIComponent($('segments').value));
+$('mode').onchange=()=>{const pair=$('mode').value==='pair';$('pair-fields').hidden=!pair;$('dataset-fields').hidden=pair;$('prepare').hidden=!pair;$('confirmation').hidden=!pair};
+api('defaults').then(d=>{if(!form.elements.engine.value)form.elements.engine.value=d.engine;form.elements.device.querySelector('[value=cuda]').disabled=!d.cuda_available;showMessage('device-status',d.cuda_available?'CPU 与 NVIDIA GPU 均可选。':d.cuda_reason)}).catch(e=>showMessage('device-status',e.message));
+$('training-unit').onchange=()=>{const unit=$('training-unit').value,count=trainCount();if(count){if(unit==='steps')form.elements.steps.value=Math.ceil(Number(form.elements.epochs.value)*count);else form.elements.epochs.value=Number(form.elements.steps.value)/count}setUnit(unit)};form.addEventListener('input',updateTarget);
+$('lr-slider').oninput=()=>form.elements.lr.value=Number((10**Number($('lr-slider').value)).toPrecision(3));form.elements.lr.oninput=()=>$('lr-slider').value=Math.log10(Number(form.elements.lr.value));
+$('check-engine').onclick=async()=>{try{showMessage('engine-status','正在检查…');showMessage('engine-status',(await api('engine',{engine:form.elements.engine.value})).message)}catch(e){showMessage('engine-status',e.message)}};
+function drawChart(history){const svg=$('chart');svg.replaceChildren();const all=history.flatMap(p=>[p.loss_average,p.validation_loss]).filter(Number.isFinite);const node=(tag,attrs,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el};if(!all.length){node('text',{x:240,y:95,'text-anchor':'middle',fill:'#819087','font-size':13},'开始训练后显示误差曲线');return}const low=Math.min(...all),high=Math.max(...all),span=high-low||Math.max(high*.1,.01),maxStep=Math.max(1,...history.map(p=>p.step)),x=v=>48+v/maxStep*415,y=v=>155-(v-low)/span*125;for(let i=0;i<3;i++){const v=low+span*i/2;node('line',{x1:48,x2:463,y1:y(v),y2:y(v),stroke:'#e1e8df'});node('text',{x:42,y:y(v)+4,'text-anchor':'end',fill:'#819087','font-size':10},v.toFixed(3))}node('text',{x:48,y:179,fill:'#819087','font-size':10},'0');node('text',{x:463,y:179,'text-anchor':'end',fill:'#819087','font-size':10},maxStep+(uiLanguage==='en'?' steps':' 步'));for(const[key,color]of [['loss_average','#3c8365'],['validation_loss','#b97e3e']]){const points=history.filter(p=>Number.isFinite(p[key]));node('polyline',{points:points.map(p=>x(p.step)+','+y(p[key])).join(' '),fill:'none',stroke:color,'stroke-width':2});for(const p of points)node('circle',{cx:x(p.step),cy:y(p[key]),r:2,fill:color})}}
+addHelp(form);setUnit('epochs');localize();$('ui-language').value=uiLanguage;$('ui-language').onchange=()=>{uiLanguage=$('ui-language').value;localStorage.setItem('opensv-language',uiLanguage);localize();numberPairs();for(const id of ['error','engine-status','device-status'])if($(id).dataset.message)showMessage(id,$(id).dataset.message);if(lastState)paint(lastState);else updateTarget()};
+async function poll(){try{const state=await api('state');if(disconnected){disconnected=false;showMessage('error','')}paint(state)}catch(e){disconnected=true;$('error').textContent=(uiLanguage==='en'?'Service disconnected: ':'服务未连接：')+e.message}setTimeout(poll,1000)}poll();
+</script>
+</html>

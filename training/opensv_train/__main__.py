@@ -14,6 +14,22 @@ from .network import AcousticCore, Network
 from .runtime import atomic_save, digest, emit
 
 
+def training_device(name):
+    if name not in ("cpu", "cuda"):
+        raise ValueError("Training device must be cpu or cuda")
+    if name == "cuda" and not torch.cuda.is_available():
+        raise ValueError("CUDA is unavailable. Install a CUDA-enabled PyTorch build and check the NVIDIA driver, or choose CPU.")
+    return torch.device(name)
+
+
+def move_sample(value, device):
+    if isinstance(value, torch.Tensor):
+        return value.to(device)
+    if isinstance(value, tuple):
+        return tuple(move_sample(item, device) for item in value)
+    return value
+
+
 def load_data(path, core, scope="embeddings", objective=None):
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if manifest.get("version") != 1:
@@ -77,6 +93,7 @@ def load_data(path, core, scope="embeddings", objective=None):
 
 
 def run(args):
+    device = training_device(getattr(args, "device", "cpu"))
     if args.lr is None:
         args.lr = 0.000001 if args.vocoder is not None else 0.00001 if args.scope == "acoustic" else 0.001
     if args.steps < 1 or args.seconds <= 0 or not math.isfinite(args.seconds):
@@ -92,10 +109,6 @@ def run(args):
     expected_model = json.loads(args.dataset.read_text(encoding="utf-8")).get("model_sha256")
     if expected_model is not None and expected_model != digest(args.model):
         raise ValueError("Dataset was captured for a different base model")
-    core.requires_grad_(args.scope == "acoustic")
-    parameters = core.training_parameters() if args.scope == "acoustic" else [core.speaker, core.style]
-    for parameter in parameters:
-        parameter.requires_grad_(True)
     if args.scope == "acoustic":
         matrices = [node for module in core.modules() if isinstance(module, Network) for node in module.tensor_nodes]
         model.make_dense([*matrices, core.language_node])
@@ -106,6 +119,13 @@ def run(args):
             raise ValueError("Audio supervision requires acoustic scope")
         objective = AudioObjective(model, args.vocoder)
     groups, signatures = load_data(args.dataset, core, args.scope, objective)
+    core.to(device)
+    if objective is not None:
+        objective.to(device)
+    core.requires_grad_(args.scope == "acoustic")
+    parameters = core.training_parameters() if args.scope == "acoustic" else [core.speaker, core.style]
+    for parameter in parameters:
+        parameter.requires_grad_(True)
     contract = {"model": digest(args.model), "samples": signatures,
                 "scope": args.scope, "lr": args.lr, "seed": args.seed,
                 "threads": args.threads, "backend_version": 2 if args.scope == "acoustic" else 1}
@@ -135,6 +155,7 @@ def run(args):
 
 def train(args, model, core, parameters, groups, contract, state, started, rng, objective=None):
     output = args.output
+    device = parameters[0].device
     optimizer = torch.optim.Adam(parameters, lr=args.lr)
     step, best_loss = 0, float("inf")
     cursor, order = 0, []
@@ -156,7 +177,7 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
         rng.setstate(state["rng"])
 
     def forward(item):
-        context, noise, target = item
+        context, noise, target = move_sample(item, device)
         if args.scope == "acoustic":
             inputs = core.frame_context(*context)
         else:
@@ -192,7 +213,7 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
     best_step = state["best_step"] if state else 0
     gradient_names = set(state.get("gradient_names", [])) if state else set()
     parameter_count = sum(p.numel() for p in parameters)
-    emit(event="ready", backend="pytorch", scope=args.scope, trained_parameters=parameter_count,
+    emit(event="ready", backend="pytorch", device=str(device), scope=args.scope, trained_parameters=parameter_count,
          inactive_parameters=sum(p.numel() for p in core.parameters() if not p.requires_grad),
          train_samples=len(groups["train"]), validation_samples=len(groups["validation"]), step=step)
     if state is None:
@@ -204,6 +225,9 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
     previous_handler = signal.signal(signal.SIGINT, interrupt)
     try:
         while not interrupted and step < args.steps and time.monotonic() - started < args.seconds:
+            if getattr(args, "stop_file", None) and args.stop_file.exists():
+                interrupted = True
+                break
             if cursor >= len(order):
                 order = list(range(len(groups["train"])))
                 rng.shuffle(order)
@@ -236,7 +260,7 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
     temporary.write_bytes(model.to_bytes())
     Model.read(temporary)
     temporary.replace(destination)
-    report = {"backend": "pytorch", "scope": args.scope, "trained_parameters": parameter_count,
+    report = {"backend": "pytorch", "device": str(device), "scope": args.scope, "trained_parameters": parameter_count,
               "parameter_tensors": len(parameters), "gradient_tensors": len(gradient_names),
               "inactive_parameters": sum(p.numel() for p in core.parameters() if not p.requires_grad),
               "step": step, "best_step": best_step, "validation_loss": best_loss,
@@ -259,14 +283,21 @@ def main():
     parser.add_argument("--steps", type=int, default=100)
     parser.add_argument("--seconds", type=float, default=1800)
     parser.add_argument("--threads", type=int, default=4)
+    parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
     parser.add_argument("--save-every", type=int, default=25)
     parser.add_argument("--lr", type=float)
     parser.add_argument("--seed", type=int, default=5489)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--stop-file", type=Path)
     parser.add_argument("--vocoder", type=Path)
     args = parser.parse_args()
     try:
         return run(args)
+    except torch.cuda.OutOfMemoryError as error:
+        message = ("GPU memory is insufficient. Close other GPU applications, use shorter audio segments, or choose CPU."
+                   if args.device == "cuda" else str(error))
+        emit(event="error", message=message)
+        return 1
     except (ValueError, OSError, KeyError, RuntimeError) as error:
         emit(event="error", message=str(error))
         return 1
