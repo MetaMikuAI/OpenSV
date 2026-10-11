@@ -34,6 +34,7 @@ pub struct Request<'a> {
     pub language: &'a str,
     pub dictionary: Option<&'a Path>,
     pub seed: u32,
+    pub audio: bool,
 }
 
 pub fn run(request: &Request<'_>) -> Result<()> {
@@ -59,6 +60,20 @@ pub fn run(request: &Request<'_>) -> Result<()> {
     fs::create_dir_all(request.output.parent().unwrap_or(Path::new(".")))?;
     fs::create_dir(request.output)?;
     fs::write(request.output.join("base_model.dnni"), model)?;
+    if request.audio {
+        ensure!(
+            source.vocoder.sample_rate == teacher.vocoder.sample_rate,
+            "sample rates differ"
+        );
+        let model = if request.voice.is_dir() {
+            fs::read(request.voice.join("pitch_model.dnni"))?
+        } else {
+            read_nofs(&fs::read(request.voice)?)?
+                .remove(b"vocoder".as_slice())
+                .ok_or_else(|| anyhow::anyhow!("missing vocoder"))?
+        };
+        fs::write(request.output.join("pitch_model.dnni"), model)?;
+    }
     for (split, phrases) in ["train", "validation"].iter().zip(prepared) {
         for (index, phrase) in phrases.iter().enumerate() {
             let directory = request.output.join(format!("{split}-{index:04}"));
@@ -74,15 +89,30 @@ pub fn run(request: &Request<'_>) -> Result<()> {
                 baseline.noise.data == prediction.noise.data,
                 "teacher noise mismatch"
             );
-            let target =
-                features.target_from(&teacher.acoustic.features, &prediction.normalized)?;
+            if request.audio {
+                let samples = teacher.vocoder.render(&prediction.decoded)?;
+                let spec = hound::WavSpec {
+                    channels: 1,
+                    sample_rate: teacher.vocoder.sample_rate,
+                    bits_per_sample: 32,
+                    sample_format: hound::SampleFormat::Float,
+                };
+                let mut writer = hound::WavWriter::create(directory.join("target.wav"), spec)?;
+                for sample in samples {
+                    writer.write_sample(sample)?;
+                }
+                writer.finalize()?;
+            } else {
+                let target =
+                    features.target_from(&teacher.acoustic.features, &prediction.normalized)?;
+                tensor(&directory, "target", &target)?;
+            }
             let phones = features.encode(&phrase.phones)?;
             let pitch = features.normalize_pitch(&phrase.log_f0)?;
             for (name, value) in [
                 ("phones", &phones),
                 ("pitch", &pitch),
                 ("noise", &baseline.noise),
-                ("target", &target),
                 ("baseline", &baseline.normalized),
             ] {
                 tensor(&directory, name, value)?;
@@ -97,7 +127,7 @@ pub fn run(request: &Request<'_>) -> Result<()> {
                 "counts": phrase.phones.iter().map(|p| p.frames).collect::<Vec<_>>(),
                 "languages": languages,
                 "symbols": phrase.phones.iter().map(|p| &p.symbol).collect::<Vec<_>>(),
-                "log_f0": phrase.log_f0});
+                "log_f0": phrase.log_f0, "supervision": if request.audio { "audio" } else { "features" }});
             fs::write(
                 directory.join("sample.json"),
                 serde_json::to_vec_pretty(&metadata)?,

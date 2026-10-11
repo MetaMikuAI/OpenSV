@@ -30,6 +30,8 @@ pub struct TrainArgs {
     seed: u32,
     #[arg(long)]
     resume: bool,
+    #[arg(long)]
+    vocoder: Option<PathBuf>,
 }
 
 pub fn run(args: TrainArgs) -> Result<()> {
@@ -70,6 +72,9 @@ pub fn run(args: TrainArgs) -> Result<()> {
     }
     if args.resume {
         command.arg("--resume");
+    }
+    if let Some(vocoder) = args.vocoder {
+        command.arg("--vocoder").arg(vocoder);
     }
     let status = command.status().context(
         "cannot start Python; install the training package with python -m pip install -e training",
@@ -141,6 +146,8 @@ pub fn components(args: ComponentsArgs) -> Result<()> {
 
 #[derive(Args)]
 pub struct CaptureArgs {
+    #[arg(long)]
+    audio: bool,
     #[arg(long, default_value = "python")]
     python: PathBuf,
     #[arg(long)]
@@ -170,6 +177,7 @@ pub fn capture(args: CaptureArgs) -> Result<()> {
         language: &args.language,
         dictionary: args.dictionary.as_deref(),
         seed: args.seed,
+        audio: args.audio,
     })?;
     let mut command = Command::new(args.python);
     command

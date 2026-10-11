@@ -18,9 +18,14 @@ def pack(output):
     core = AcousticCore(Model.read(model).root)
     samples, signatures = [], set()
     maximum_error = 0.0
+    supervision = None
     for path in sorted(output.glob("*/sample.json")):
         row = json.loads(path.read_text(encoding="utf-8"))
         directory = path.parent
+        mode = row.get("supervision", "features")
+        if mode not in ("audio", "features") or supervision not in (None, mode):
+            raise ValueError("Mixed or unsupported supervision")
+        supervision = mode
         counts = np.asarray(row["counts"])
         languages = np.asarray(row["languages"])
         frames = row["frames"]
@@ -33,8 +38,13 @@ def pack(output):
             raise ValueError("Invalid frame counts")
         counts, languages = counts.astype(np.int64), languages.astype(np.int64)
         arrays = {"counts": counts, "languages": languages}
-        for name, shape in (("phones", (len(counts), 108)), ("pitch", (frames, 1)),
-                            ("noise", (frames, 4)), ("target", (frames, 71)), ("baseline", (frames, 71))):
+        shapes = [("phones", (len(counts), 108)), ("pitch", (frames, 1)),
+                  ("noise", (frames, 4)), ("baseline", (frames, 71))]
+        if mode == "features":
+            shapes.append(("target", (frames, 71)))
+        else:
+            arrays["log_f0"] = np.asarray(row["log_f0"], dtype=np.float32).reshape(frames, 1)
+        for name, shape in shapes:
             value = np.fromfile(directory / f"{name}.f32", dtype="<f4").reshape(shape)
             if not np.isfinite(value).all():
                 raise ValueError(f"Nonfinite {name}")
@@ -55,10 +65,13 @@ def pack(output):
         destination = output / f"{directory.name}.npz"
         with destination.open("xb") as stream:
             np.savez(stream, **arrays)
-        samples.append({"id": directory.name, "split": row["split"], "features": destination.name})
+        sample = {"id": directory.name, "split": row["split"], "features": destination.name}
+        if mode == "audio":
+            sample["audio"] = (directory / "target.wav").relative_to(output).as_posix()
+        samples.append(sample)
     if {row["split"] for row in samples} != {"train", "validation"}:
         raise ValueError("Both training and validation samples are required")
-    manifest = {"version": 1, "model_sha256": digest(model), "samples": samples,
+    manifest = {"version": 1, "model_sha256": digest(model), "samples": samples, "supervision": supervision,
                 "capture": {"engine": "metasv", "pitch_mode": "notes", "timing": "student",
                             "rust_torch_max_error": maximum_error}}
     with (output / "dataset.json").open("x", encoding="utf-8") as stream:

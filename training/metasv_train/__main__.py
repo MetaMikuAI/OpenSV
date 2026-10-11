@@ -14,12 +14,16 @@ from .network import AcousticCore, Network
 from .runtime import atomic_save, digest, emit
 
 
-def load_data(path, core, scope="embeddings"):
+def load_data(path, core, scope="embeddings", objective=None):
     manifest = json.loads(path.read_text(encoding="utf-8"))
     if manifest.get("version") != 1:
         raise ValueError("Unsupported dataset version")
+    if manifest.get("supervision", "features") not in ("features", "audio"):
+        raise ValueError("Unsupported supervision")
+    if (manifest.get("supervision", "features") == "audio") != (objective is not None):
+        raise ValueError("Audio datasets require --vocoder; feature datasets must omit it")
     groups = {"train": [], "validation": []}
-    signatures, ids, files = [], set(), set()
+    signatures, ids, files, audio_files = [], set(), set(), set()
     for row in manifest["samples"]:
         name, split = row["id"], row["split"]
         source = (path.parent / row["features"]).resolve()
@@ -38,12 +42,30 @@ def load_data(path, core, scope="embeddings"):
                     raise ValueError(f"{name}: invalid {key} shape or values")
                 return torch.from_numpy(value.copy())
             phones, pitch = matrix("phones", 108), matrix("pitch", 1)
-            noise, target = matrix("noise", 4), matrix("target", 71)
+            noise = matrix("noise", 4)
+            if objective is None:
+                target = matrix("target", 71)
+            else:
+                from .audio import read_wav
+                audio_path = (path.parent / row["audio"]).resolve()
+                waveform = read_wav(audio_path, objective.vocoder.sample_rate)
+                if len(waveform) != len(pitch) * objective.vocoder.hop:
+                    raise ValueError(f"{name}: WAV length does not match aligned frames")
+                log_f0 = matrix("log_f0", 1)
+                if (len(log_f0) != len(pitch) or not bool(log_f0.exp().isfinite().all())
+                        or not bool((log_f0.exp() > 0).all())):
+                    raise ValueError("Invalid aligned F0")
+                target = (log_f0, waveform)
+                audio_signature = digest(audio_path)
+                if audio_signature in audio_files:
+                    raise ValueError("Duplicate target WAV content")
+                audio_files.add(audio_signature)
+                signatures.append((name, "audio", audio_signature))
             counts, languages = archive["counts"], archive["languages"]
             for value in (counts, languages):
                 if value.shape != (len(phones),) or value.dtype.kind not in "iu":
                     raise ValueError(f"{name}: invalid phoneme counts/languages")
-            if len(noise) != len(pitch) or len(target) != len(pitch):
+            if len(noise) != len(pitch) or (objective is None and len(target) != len(pitch)):
                 raise ValueError(f"{name}: frame counts differ")
             with torch.no_grad():
                 context = core.frame_context(phones, counts.tolist(), languages.tolist(), pitch)
@@ -56,7 +78,7 @@ def load_data(path, core, scope="embeddings"):
 
 def run(args):
     if args.lr is None:
-        args.lr = 0.00001 if args.scope == "acoustic" else 0.001
+        args.lr = 0.000001 if args.vocoder is not None else 0.00001 if args.scope == "acoustic" else 0.001
     if args.steps < 1 or args.seconds <= 0 or not math.isfinite(args.seconds):
         raise ValueError("Steps and seconds must be positive")
     if args.threads < 1 or args.save_every < 1 or not 0 < args.lr < 1:
@@ -77,10 +99,18 @@ def run(args):
     if args.scope == "acoustic":
         matrices = [node for module in core.modules() if isinstance(module, Network) for node in module.tensor_nodes]
         model.make_dense([*matrices, core.language_node])
-    groups, signatures = load_data(args.dataset, core, args.scope)
+    objective = None
+    if args.vocoder is not None:
+        from .audio import AudioObjective
+        if args.scope != "acoustic":
+            raise ValueError("Audio supervision requires acoustic scope")
+        objective = AudioObjective(model, args.vocoder)
+    groups, signatures = load_data(args.dataset, core, args.scope, objective)
     contract = {"model": digest(args.model), "samples": signatures,
                 "scope": args.scope, "lr": args.lr, "seed": args.seed,
                 "threads": args.threads, "backend_version": 2 if args.scope == "acoustic" else 1}
+    if objective is not None:
+        contract.update(vocoder=objective.signature, loss="multiresolution_stft_v1")
     output = args.output
     state = None
     if args.resume:
@@ -98,12 +128,12 @@ def run(args):
             state = torch.load(output / "latest.pt", map_location="cpu", weights_only=True)
             if state["contract"] != contract:
                 raise ValueError("Resume requires unchanged model, dataset and training settings")
-        return train(args, model, core, parameters, groups, contract, state, started, rng)
+        return train(args, model, core, parameters, groups, contract, state, started, rng, objective)
     finally:
         lock.unlink()
 
 
-def train(args, model, core, parameters, groups, contract, state, started, rng):
+def train(args, model, core, parameters, groups, contract, state, started, rng, objective=None):
     output = args.output
     optimizer = torch.optim.Adam(parameters, lr=args.lr)
     step, best_loss = 0, float("inf")
@@ -133,7 +163,8 @@ def train(args, model, core, parameters, groups, contract, state, started, rng):
             frames = len(context)
             inputs = torch.cat((context[:, :72], core.speaker.expand(frames, -1),
                                 context[:, 104:112], core.style.expand(frames, -1)), dim=1)
-        return (core(inputs, noise) - target).square().mean()
+        prediction = core(inputs, noise)
+        return objective(prediction, target) if objective is not None else (prediction - target).square().mean()
 
     @torch.no_grad()
     def evaluate():
@@ -155,7 +186,7 @@ def train(args, model, core, parameters, groups, contract, state, started, rng):
                      "best_vectors": best_vectors, "best_step": best_step,
                      "gradient_names": sorted(gradient_names),
                      "cursor": cursor, "order": order, "rng": rng.getstate()}, output / "latest.pt")
-        emit(event="checkpoint", step=step, validation_mse=score, best_step=best_step)
+        emit(event="checkpoint", step=step, validation_loss=score, loss_kind=contract.get("loss", "feature_mse"), best_step=best_step)
 
     best_vectors = state["best_vectors"] if state else [p.detach().clone() for p in parameters]
     best_step = state["best_step"] if state else 0
@@ -208,9 +239,12 @@ def train(args, model, core, parameters, groups, contract, state, started, rng):
     report = {"backend": "pytorch", "scope": args.scope, "trained_parameters": parameter_count,
               "parameter_tensors": len(parameters), "gradient_tensors": len(gradient_names),
               "inactive_parameters": sum(p.numel() for p in core.parameters() if not p.requires_grad),
-              "step": step, "best_step": best_step, "validation_mse": best_loss,
+              "step": step, "best_step": best_step, "validation_loss": best_loss,
+              "loss_kind": contract.get("loss", "feature_mse"),
               "complete": step >= args.steps, "interrupted": interrupted,
               "model": str(destination.resolve()), "seconds": time.monotonic() - started}
+    if objective is None:
+        report["validation_mse"] = best_loss
     (output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     emit(event="complete", **report)
     return 130 if interrupted else 0
@@ -229,6 +263,7 @@ def main():
     parser.add_argument("--lr", type=float)
     parser.add_argument("--seed", type=int, default=5489)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--vocoder", type=Path)
     args = parser.parse_args()
     try:
         return run(args)

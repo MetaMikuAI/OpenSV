@@ -5,31 +5,33 @@
 ## 声学流程
 
 ```powershell
-uv run --project training --locked metasv dataset capture --voice base-voice --teacher teacher-voice --train-project train.svp --validation-project validation.svp --output dataset --language mandarin --dictionary path/to/clf-data
-uv run --project training --locked metasv train --model dataset/base_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100 --seconds 1800
+uv run --project training --locked metasv dataset capture --audio --voice base-voice --teacher teacher-voice --train-project train.svp --validation-project validation.svp --output dataset --language mandarin --dictionary path/to/clf-data
+uv run --project training --locked metasv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100 --seconds 1800
 metasv voice-export --voice base-voice --model runs/demo/trained-base.dnni --output trained.nofs
 metasv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
 ```
 
 `--voice` 和 `--teacher` 接受已解码 NOFS 或模型目录。目录需要 `base_model.dnni`、`timing_model.dnni`、`pitch_model.dnni`。工程已填写显式音素时可省略词典。
 
-采集使用底模时长、相同音符音高与噪声，将老师输出转换到底模的归一化范围。训练与验证材料须分开；采集会拒绝重复输入，并核对 Rust／PyTorch 输出。尚不支持 SVP／VSQX 配对 WAV 的对齐和特征提取。
+`--audio` 采集老师干声 WAV，使用底模时长与相同音符音高。训练将多尺度频谱误差通过固定声码器反传到声学网络，不使用老师中间特征作为目标。时长、F0、声码器权重及清浊音硬判定不训练。训练与验证材料须分开。
+
+外部 WAV 需单声道、与声码器采样率一致，并提供逐音素时长和逐帧 F0；尚不自动完成 SVP／VSQX 与任意录音的对齐。受控合成采集已提供这些条件。
 
 | 训练范围 | 参数 | 默认学习率 |
 | --- | --- | --- |
-| `acoustic`（默认） | 十个声学子网络、音色向量、语言嵌入 | 0.00001 |
+| `acoustic`（默认） | 十个声学子网络、音色向量、语言嵌入 | WAV：0.000001；特征：0.00001 |
 | `embeddings` | speaker／style 共 64 个参数 | 0.001 |
 
 声学训练冻结不影响输出的末级残差参数，其余矩阵转为浮点稠密存储，模型文件会变大。导出保留模板的其他模型，不保证兼容官方宿主。
 
 ## 数据格式
 
-采集输出 `base_model.dnni`、`dataset.json`、NPZ 与原始特征。清单中的路径相对于清单目录：
+音频采集输出底模、声码器、清单、NPZ 和干声 WAV。清单中的路径相对于清单目录：
 
 ```json
-{"version":1,"samples":[
-  {"id":"train-01","split":"train","features":"train-01.npz"},
-  {"id":"validation-01","split":"validation","features":"validation-01.npz"}
+{"version":1,"supervision":"audio","samples":[
+  {"id":"train-01","split":"train","features":"train-01.npz","audio":"train-01.wav"},
+  {"id":"validation-01","split":"validation","features":"validation-01.npz","audio":"validation-01.wav"}
 ]}
 ```
 
@@ -39,15 +41,17 @@ metasv render --voice trained.nofs --project song.svp --output song.wav --langua
 | `counts` | N | 音素帧数，正整数，总和为 T |
 | `languages` | N | 底模语言索引，整数 |
 | `pitch` | T × 1 | 归一化音高 |
-| `noise` | T × 4 | 生成目标时的噪声 |
-| `target` | T × 71 | 底模范围内的归一化声学目标，不是梅尔频谱 |
+| `noise` | T × 4 | 声学推理噪声 |
+| `log_f0` | T × 1 | 以 Hz 表示的 F0 的自然对数 |
 
-N 为音素数，T 为帧数。自动采集的清单还包含底模哈希，训练时会校验。
+N 为音素数，T 为帧数，每帧 5 ms。WAV 长度必须等于 T × 声码器步长；支持浮点 32 位、PCM 16／24 位。自动采集还校验底模哈希和 Rust／PyTorch 声学输出。
+
+特征监督：采集省略 `--audio`，训练省略 `--vocoder`，NPZ 使用 `target`（T × 71 的归一化声学目标）替代 `log_f0` 和 WAV。
 
 ## 续训与输出
 
 ```powershell
-uv run --project training --locked metasv train --model dataset/base_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 200 --resume
+uv run --project training --locked metasv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 200 --resume
 ```
 
 `--steps` 是累计步数；`--seconds` 是本次软时间限制，当前步骤、检查和导出可能超时。默认每 25 步保存，正常结束也保存。续训要求底模、数据和训练设置不变。
@@ -56,7 +60,7 @@ uv run --project training --locked metasv train --model dataset/base_model.dnni 
 - `trained-base.dnni`：验证集最优模型，可能早于最新步骤。
 - `report.json`：参数数量、训练进度和验证误差。
 
-同一目录只允许一个训练进程。强制结束后若留下 `run.lock`，确认进程已退出再删除。短程测试仅验证流程，不代表音色质量达标。
+同一目录只允许一个训练进程。强制结束后若留下 `run.lock`，确认进程已退出再删除。
 
 ## 其他模块
 
