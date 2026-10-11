@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 import torch
 
-from metasv_train.__main__ import load_data
+from opensv_train.__main__ import load_data
 
 
 class ContextStub:

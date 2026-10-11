@@ -8,9 +8,9 @@ import unittest
 import numpy as np
 import torch
 
-from metasv_train.__main__ import load_data
-from metasv_train.audio import read_wav
-from metasv_train.vocoder import excitation, lf_parameters, lf_spectrum
+from opensv_train.__main__ import load_data
+from opensv_train.audio import read_wav
+from opensv_train.vocoder import excitation, lf_parameters, lf_spectrum
 
 
 def wav(samples, rate=48000):

@@ -3,7 +3,7 @@ import unittest
 
 import numpy as np
 
-from metasv_train.format import Model, SEEDS, tensor, type_hash, replace_tensor
+from opensv_train.format import Model, SEEDS, tensor, type_hash, replace_tensor
 
 
 class DenseExportTests(unittest.TestCase):

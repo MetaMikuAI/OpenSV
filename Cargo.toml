@@ -1,13 +1,13 @@
 [package]
-name = "metasv"
+name = "opensv"
 version = "0.1.0"
 edition = "2024"
 description = "Singing synthesis in Rust"
 license = "GPL-3.0-only"
-default-run = "metasv"
+default-run = "opensv"
 
 [[bin]]
-name = "metasv"
+name = "opensv"
 path = "src/main.rs"
 
 [dependencies]

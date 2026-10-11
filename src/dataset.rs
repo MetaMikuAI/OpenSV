@@ -140,7 +140,7 @@ mod tests {
     use super::*;
     #[test]
     fn paired_files_are_not_marked_training_ready() {
-        let dir = std::env::temp_dir().join(format!("metasv-dataset-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("opensv-dataset-{}", std::process::id()));
         fs::create_dir_all(&dir).unwrap();
         let project = dir.join("song.svp");
         fs::write(

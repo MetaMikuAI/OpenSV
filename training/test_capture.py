@@ -7,7 +7,7 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from metasv_train.capture import pack
+from opensv_train.capture import pack
 
 
 class CoreStub:
@@ -24,8 +24,8 @@ class CaptureTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         (self.root / "base_model.dnni").write_bytes(b"test-model")
-        self.model = patch("metasv_train.capture.Model.read").start()
-        self.core = patch("metasv_train.capture.AcousticCore", return_value=CoreStub()).start()
+        self.model = patch("opensv_train.capture.Model.read").start()
+        self.core = patch("opensv_train.capture.AcousticCore", return_value=CoreStub()).start()
         self.addCleanup(patch.stopall)
         for index, split in enumerate(("train", "validation")):
             sample = self.root / split

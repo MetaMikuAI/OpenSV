@@ -30,7 +30,7 @@ pub fn export(template: &Path, model: &Path, output: &Path) -> Result<()> {
             entries.insert(b"f0model-dds".to_vec(), fs::read(f0)?);
         }
         for (key, value) in [
-            (".name", "MetaSV"),
+            (".name", "OpenSV"),
             (".language", "japanese"),
             (".phoneset", "romaji"),
             (".version", "201"),

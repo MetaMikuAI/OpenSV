@@ -48,7 +48,7 @@ pub fn run(args: TrainArgs) -> Result<()> {
     let mut command = Command::new(args.python);
     command
         .env("PYTHONUTF8", "1")
-        .args(["-u", "-m", "metasv_train"])
+        .args(["-u", "-m", "opensv_train"])
         .arg("--model")
         .arg(args.model)
         .arg("--scope")
@@ -114,7 +114,7 @@ pub fn components(args: ComponentsArgs) -> Result<()> {
     let mut command = Command::new(args.python);
     command
         .env("PYTHONUTF8", "1")
-        .args(["-u", "-m", "metasv_train.components"])
+        .args(["-u", "-m", "opensv_train.components"])
         .arg("--voice")
         .arg(args.voice)
         .arg("--teacher")
@@ -182,7 +182,7 @@ pub fn capture(args: CaptureArgs) -> Result<()> {
     let mut command = Command::new(args.python);
     command
         .env("PYTHONUTF8", "1")
-        .args(["-u", "-m", "metasv_train.capture"])
+        .args(["-u", "-m", "opensv_train.capture"])
         .arg("--output")
         .arg(args.output);
     let status = command

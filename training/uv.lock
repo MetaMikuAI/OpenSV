@@ -167,7 +167,7 @@ wheels = [
 ]
 
 [[package]]
-name = "metasv-train"
+name = "opensv-train"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -5,10 +5,10 @@
 ## 声学流程
 
 ```powershell
-uv run --project training --locked metasv dataset capture --audio --voice base-voice --teacher teacher-voice --train-project train.svp --validation-project validation.svp --output dataset --language mandarin --dictionary path/to/clf-data
-uv run --project training --locked metasv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100 --seconds 1800
-metasv voice-export --voice base-voice --model runs/demo/trained-base.dnni --output trained.nofs
-metasv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
+uv run --project training --locked opensv dataset capture --audio --voice base-voice --teacher teacher-voice --train-project train.svp --validation-project validation.svp --output dataset --language mandarin --dictionary path/to/clf-data
+uv run --project training --locked opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100 --seconds 1800
+opensv voice-export --voice base-voice --model runs/demo/trained-base.dnni --output trained.nofs
+opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
 ```
 
 `--voice` 和 `--teacher` 接受已解码 NOFS 或模型目录。目录需要 `base_model.dnni`、`timing_model.dnni`、`pitch_model.dnni`。工程已填写显式音素时可省略词典。
@@ -51,7 +51,7 @@ N 为音素数，T 为帧数，每帧 5 ms。WAV 长度必须等于 T × 声码�
 ## 续训与输出
 
 ```powershell
-uv run --project training --locked metasv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 200 --resume
+uv run --project training --locked opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 200 --resume
 ```
 
 `--steps` 是累计步数；`--seconds` 是本次软时间限制，当前步骤、检查和导出可能超时。默认每 25 步保存，正常结束也保存。续训要求底模、数据和训练设置不变。
@@ -64,6 +64,6 @@ uv run --project training --locked metasv train --model dataset/base_model.dnni 
 
 ## 其他模块
 
-`train-components` 可使用已有中间特征训练时长、自动 F0 和声码器；当前采集入口尚不生成这些特征。参数见 `metasv train-components --help`。
+`train-components` 可使用已有中间特征训练时长、自动 F0 和声码器；当前采集入口尚不生成这些特征。参数见 `opensv train-components --help`。
 
 其中 `pitch_model.dnni` 是声码器，`f0_model.dnni` 才是自动 F0。各网络单独计算损失，固定滤波器和归一化统计不训练，不进行端到端波形反传；老师与底模权重相同时允许零更新。未指定 `--acoustic-model` 时沿用底模声学模型。

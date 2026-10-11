@@ -1,5 +1,5 @@
 use anyhow::{Result, ensure};
-use metasv::{
+use opensv::{
     phones::language_index,
     project,
     tensor::Tensor,

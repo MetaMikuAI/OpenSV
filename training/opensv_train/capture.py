@@ -72,7 +72,7 @@ def pack(output):
     if {row["split"] for row in samples} != {"train", "validation"}:
         raise ValueError("Both training and validation samples are required")
     manifest = {"version": 1, "model_sha256": digest(model), "samples": samples, "supervision": supervision,
-                "capture": {"engine": "metasv", "pitch_mode": "notes", "timing": "student",
+                "capture": {"engine": "opensv", "pitch_mode": "notes", "timing": "student",
                             "rust_torch_max_error": maximum_error}}
     with (output / "dataset.json").open("x", encoding="utf-8") as stream:
         json.dump(manifest, stream, ensure_ascii=False, indent=2)

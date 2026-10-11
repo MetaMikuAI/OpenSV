@@ -3,7 +3,7 @@ mod training;
 
 use anyhow::{Result, ensure};
 use clap::{Parser, Subcommand};
-use metasv::{
+use opensv::{
     acoustic::AcousticModel, model::Model, network::Network, phones::TimedPhoneme, tensor::Tensor,
 };
 use serde::Deserialize;
@@ -14,7 +14,7 @@ use std::{
 };
 
 #[derive(Parser)]
-#[command(name = "metasv", version, about = "MetaSV singing synthesis")]
+#[command(name = "opensv", version, about = "OpenSV singing synthesis")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -162,7 +162,7 @@ fn main() -> Result<()> {
             model,
             output,
         } => {
-            metasv::voice::export(&voice, &model, &output)?;
+            opensv::voice::export(&voice, &model, &output)?;
             println!("{}", output.display());
         }
         Command::Train(args) => training::run(args)?,
@@ -174,7 +174,7 @@ fn main() -> Result<()> {
                     json,
                 },
         } => {
-            let report = metasv::dataset::check(&project, &audio)?;
+            let report = opensv::dataset::check(&project, &audio)?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
@@ -201,7 +201,7 @@ fn main() -> Result<()> {
             seed,
             pitch_mode: _,
         } => {
-            let report = metasv::workflow::render(&metasv::workflow::RenderRequest {
+            let report = opensv::workflow::render(&opensv::workflow::RenderRequest {
                 voice,
                 project,
                 output,
@@ -221,7 +221,7 @@ fn main() -> Result<()> {
             output,
         } => {
             ensure!(!output.exists(), "output already exists");
-            let vocoder = metasv::vocoder::Vocoder::load(&Model::read(model)?)?;
+            let vocoder = opensv::vocoder::Vocoder::load(&Model::read(model)?)?;
             let x = read_tensor(&input, frames, 72)?;
             let started = std::time::Instant::now();
             let samples = vocoder.render(&x)?;

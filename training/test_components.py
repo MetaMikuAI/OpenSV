@@ -3,8 +3,8 @@ import unittest
 
 import torch
 
-from metasv_train.components import Component, normalize
-from metasv_train.format import Node
+from opensv_train.components import Component, normalize
+from opensv_train.format import Node
 
 
 def vector(values):
