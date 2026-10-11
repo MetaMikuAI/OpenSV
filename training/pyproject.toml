@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metasv-train"
+version = "0.1.0"
+description = "MetaSV training backend"
+requires-python = ">=3.11"
+dependencies = ["torch>=2.6", "numpy>=1.26"]
+license = "GPL-3.0-only"
+
+[tool.setuptools.packages.find]
+include = ["metasv_train*"]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'win32' or sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

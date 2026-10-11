@@ -1,0 +1,13 @@
+/target/
+/local/
+/results/
+*.nofs
+*.dnni
+*.wav
+*.f32
+*.pt
+*.npz
+__pycache__/
+*.egg-info/
+.venv/
+
