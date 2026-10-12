@@ -69,6 +69,16 @@ opensv render --voice trained.nofs --project song.svp --output song.wav --langua
 
 渲染使用音符音高，尚不支持自动 F0、参数曲线、引用组及加密声库；导出不保证兼容官方宿主。模型、声库、音频和发音词典需自行准备，引擎与分发 ZIP 不提交到 Git。
 
+## Flat 声库装配（实验性）
+
+```powershell
+opensv voice-pack --voice trained.nofs --template path/to/voice.104.nofs --models path/to/models --runtime path/to/synthv-flat.dll --name "Example Voice" --vendor "Example Author" --output voice-flat.zip
+```
+
+输入声库须包含声学、时长、声码器及自动音高模型；模板及模型目录应来自对应底模的 Flat 安装。命令保留模板模型结构，恢复量化权重并生成默认声音配置，不修改训练文件。`--version` 默认 `201`；可选 `--profile` 和 `--background` 接受 PNG。
+
+ZIP 包含 `databases/` 和 `models/`，解压到 Flat 数据目录后重启宿主。当前只接受已验证的运行库版本，未知版本会报错；不提供官方 SVPK 安装包兼容保证。导出后需在目标宿主试听验证。
+
 ## 目录
 
 - `src/`：Rust CLI、模型读取与推理。

@@ -79,6 +79,16 @@ Rendering uses note pitch; automatic F0, parameter curves, referenced groups, an
 - [RynthV](https://github.com/cubeww/rynthv)
 - [TrainSV](https://github.com/Quadimension-CL/TrainSV)
 
+## Flat voice assembly (experimental)
+
+```powershell
+opensv voice-pack --voice trained.nofs --template path/to/voice.104.nofs --models path/to/models --runtime path/to/synthv-flat.dll --name "Example Voice" --vendor "Example Author" --output voice-flat.zip
+```
+
+The input must include acoustic, duration, vocoder and F0 models. Use a matching Flat base voice template and model directory. Assembly restores quantized weights and default voice settings without changing training files. `--version` defaults to `201`; optional `--profile` and `--background` accept PNG images.
+
+Extract the ZIP's `databases/` and `models/` into the Flat data directory and restart the host. Only the verified runtime build is accepted. This does not guarantee official SVPK installer compatibility; validate playback in the target host.
+
 ## License
 
 [GPL-3.0](LICENSE)
