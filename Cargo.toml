@@ -19,6 +19,9 @@ rustfft = "6"
 hound = "3"
 roxmltree = "0.20"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+aes = "0.8"
+cbc = "0.1"
+sha2 = "0.10"
 [profile.release]
 lto = "thin"
 codegen-units = 1

@@ -1,5 +1,6 @@
 mod capture;
 mod conditioning;
+mod flat;
 mod training;
 
 use anyhow::{Result, ensure};
@@ -22,6 +23,8 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Assemble a Flat voice archive from a trained voice and a matching template.
+    VoicePack(flat::Args),
     TrainComponents(training::ComponentsArgs),
     /// Package a trained acoustic model with a decoded voice template.
     VoiceExport {
@@ -162,6 +165,7 @@ fn main() -> Result<()> {
         Command::Dataset {
             command: DatasetCommand::Capture(args),
         } => training::capture(args)?,
+        Command::VoicePack(args) => flat::pack(args)?,
         Command::VoiceExport {
             voice,
             model,
