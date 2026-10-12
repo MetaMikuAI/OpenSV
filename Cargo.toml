@@ -1,6 +1,6 @@
 [package]
 name = "opensv"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Singing synthesis in Rust"
 license = "GPL-3.0-only"
