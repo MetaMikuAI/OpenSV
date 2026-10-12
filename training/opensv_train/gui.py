@@ -29,8 +29,8 @@ def configuration(values):
     if result["preview_language"] not in ("", "mandarin", "japanese"):
         raise ValueError("试听语言必须为中文或日语，或跟随材料语言")
     result["device"] = str(values.get("device", "cpu")).strip().lower() or "cpu"
-    if result["device"] not in ("cpu", "cuda"):
-        raise ValueError("训练设备必须为 cpu 或 cuda")
+    if result["device"] not in ("cpu", "cuda", "mps"):
+        raise ValueError("训练设备必须为 cpu、cuda 或 mps")
     pairs = values.get("pairs", [dict(project=result["project"], audio=result["audio"], offset=result["offset"])])
     if not isinstance(pairs, list) or not 1 <= len(pairs) <= 100:
         raise ValueError("请提供 1–100 组材料")
@@ -97,17 +97,22 @@ def prepared_target(config, dataset):
 
 def device_options():
     available, version, reason = False, None, ""
+    mps_available, mps_reason = False, ""
     try:
         import torch
         version = torch.version.cuda
         available = torch.cuda.is_available()
+        mps_available = torch.backends.mps.is_available()
+        if not mps_available:
+            mps_reason = "MPS 不可用，请使用支持 Metal 的 Mac 与支持 MPS 的 PyTorch，或选择 CPU"
         if not available:
             reason = ("未检测到可用的 NVIDIA GPU 或驱动" if version else
-                      "当前 PyTorch 仅支持 CPU，请先安装支持 CUDA 的 PyTorch")
+                      "当前 PyTorch 不支持 CUDA；NVIDIA GPU 需要支持 CUDA 的 PyTorch")
     except (ImportError, OSError, RuntimeError):
-        reason = "PyTorch 加载失败，请检查训练环境"
-    return dict(device="cpu", devices=["cpu", "cuda"] if available else ["cpu"],
-                cuda_available=available, cuda_version=version, cuda_reason=reason)
+        reason = mps_reason = "PyTorch 加载失败，请检查训练环境"
+    return dict(device="cpu", devices=["cpu"] + (["cuda"] if available else []) + (["mps"] if mps_available else []),
+                cuda_available=available, cuda_version=version, cuda_reason=reason,
+                mps_available=mps_available, mps_reason=mps_reason)
 
 
 class Jobs:
@@ -186,10 +191,11 @@ class Jobs:
                 config = configuration(saved)
                 if (root / "run").exists():
                     raise ValueError("该目录已有训练记录，请使用续训")
-            if config["device"] == "cuda":
+            if config["device"] in ("cuda", "mps"):
                 devices = device_options()
-                if not devices["cuda_available"]:
-                    raise ValueError("CUDA 不可用：" + devices["cuda_reason"])
+                device = config["device"]
+                if not devices[device + "_available"]:
+                    raise ValueError(device.upper() + " 不可用：" + devices[device + "_reason"])
             engine = shutil.which(config["engine"]) or config["engine"]
             if not Path(engine).is_file():
                 raise ValueError("找不到 opensv 程序，请先 cargo build --release")

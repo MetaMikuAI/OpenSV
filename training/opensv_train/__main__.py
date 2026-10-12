@@ -15,10 +15,12 @@ from .runtime import atomic_save, digest, emit
 
 
 def training_device(name):
-    if name not in ("cpu", "cuda"):
-        raise ValueError("Training device must be cpu or cuda")
+    if name not in ("cpu", "cuda", "mps"):
+        raise ValueError("Training device must be cpu, cuda or mps")
     if name == "cuda" and not torch.cuda.is_available():
         raise ValueError("CUDA is unavailable. Install a CUDA-enabled PyTorch build and check the NVIDIA driver, or choose CPU.")
+    if name == "mps" and not torch.backends.mps.is_available():
+        raise ValueError("MPS is unavailable. Use a Metal-capable Mac and an MPS-enabled PyTorch build, or choose CPU.")
     return torch.device(name)
 
 
@@ -121,7 +123,9 @@ def run(args):
     groups, signatures = load_data(args.dataset, core, args.scope, objective)
     core.to(device)
     if objective is not None:
-        objective.to(device)
+        # The fixed vocoder uses float64 and complex FFT operations. Keep its
+        # differentiable loss on CPU for MPS; Tensor.to preserves autograd.
+        objective.to("cpu" if device.type == "mps" else device)
     core.requires_grad_(args.scope == "acoustic")
     parameters = core.training_parameters() if args.scope == "acoustic" else [core.speaker, core.style]
     for parameter in parameters:
@@ -156,6 +160,7 @@ def run(args):
 def train(args, model, core, parameters, groups, contract, state, started, rng, objective=None):
     output = args.output
     device = parameters[0].device
+    loss_device = torch.device("cpu") if objective is not None and device.type == "mps" else device
     optimizer = torch.optim.Adam(parameters, lr=args.lr)
     step, best_loss = 0, float("inf")
     cursor, order = 0, []
@@ -177,7 +182,9 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
         rng.setstate(state["rng"])
 
     def forward(item):
-        context, noise, target = move_sample(item, device)
+        context, noise, target = item
+        context, noise = move_sample((context, noise), device)
+        target = move_sample(target, loss_device)
         if args.scope == "acoustic":
             inputs = core.frame_context(*context)
         else:
@@ -185,7 +192,7 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
             inputs = torch.cat((context[:, :72], core.speaker.expand(frames, -1),
                                 context[:, 104:112], core.style.expand(frames, -1)), dim=1)
         prediction = core(inputs, noise)
-        return objective(prediction, target) if objective is not None else (prediction - target).square().mean()
+        return objective(prediction.to(loss_device), target) if objective is not None else (prediction - target).square().mean()
 
     @torch.no_grad()
     def evaluate():
@@ -213,7 +220,7 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
     best_step = state["best_step"] if state else 0
     gradient_names = set(state.get("gradient_names", [])) if state else set()
     parameter_count = sum(p.numel() for p in parameters)
-    emit(event="ready", backend="pytorch", device=str(device), scope=args.scope, trained_parameters=parameter_count,
+    emit(event="ready", backend="pytorch", device=str(device), loss_device=str(loss_device), scope=args.scope, trained_parameters=parameter_count,
          inactive_parameters=sum(p.numel() for p in core.parameters() if not p.requires_grad),
          train_samples=len(groups["train"]), validation_samples=len(groups["validation"]), step=step)
     if state is None:
@@ -260,7 +267,7 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
     temporary.write_bytes(model.to_bytes())
     Model.read(temporary)
     temporary.replace(destination)
-    report = {"backend": "pytorch", "device": str(device), "scope": args.scope, "trained_parameters": parameter_count,
+    report = {"backend": "pytorch", "device": str(device), "loss_device": str(loss_device), "scope": args.scope, "trained_parameters": parameter_count,
               "parameter_tensors": len(parameters), "gradient_tensors": len(gradient_names),
               "inactive_parameters": sum(p.numel() for p in core.parameters() if not p.requires_grad),
               "step": step, "best_step": best_step, "validation_loss": best_loss,
@@ -283,7 +290,7 @@ def main():
     parser.add_argument("--steps", type=int, default=100)
     parser.add_argument("--seconds", type=float, default=1800)
     parser.add_argument("--threads", type=int, default=4)
-    parser.add_argument("--device", choices=("cpu", "cuda"), default="cpu")
+    parser.add_argument("--device", choices=("cpu", "cuda", "mps"), default="cpu")
     parser.add_argument("--save-every", type=int, default=25)
     parser.add_argument("--lr", type=float)
     parser.add_argument("--seed", type=int, default=5489)
@@ -299,7 +306,10 @@ def main():
         emit(event="error", message=message)
         return 1
     except (ValueError, OSError, KeyError, RuntimeError) as error:
-        emit(event="error", message=str(error))
+        message = str(error)
+        if args.device == "mps" and "out of memory" in message.lower():
+            message = "MPS memory is insufficient. Close other GPU applications, use shorter audio segments, or choose CPU."
+        emit(event="error", message=message)
         return 1
 
 

@@ -38,9 +38,9 @@ Training loss shows the average of the latest 20 steps, using available records 
 
 Export each WAV from the project's zero point, keeping any leading silence. Use a single dry vocal without backing music, reverb, or layered voices. Each project must contain only one active vocal track; merge referenced groups in SVP first. Each project can be up to 10 minutes long. **Audio offset is normally 0**: enter `-0.5` if you trimmed 0.5 seconds from the beginning, or `0.5` if you added 0.5 seconds of silence.
 
-Acoustic training from dry WAV audio supports CPU or NVIDIA CUDA, with CPU as the default. Data preparation and voice export still run on CPU. A GPU is not necessarily faster; measure performance on your dataset. Duration, automatic F0, and vocoder weights remain fixed. Training targets come from dry WAV audio; no teacher voicebank or teacher model's internal features are required. Pitch is extracted from the WAV and phoneme boundaries are estimated by the base model. This does not replace phoneme-level forced alignment, and passing the checks does not guarantee correct lyrics or alignment for every phoneme.
+Acoustic training from dry WAV audio supports CPU, NVIDIA CUDA, or Apple MPS, with CPU as the default. Data preparation and voice export still run on CPU. A GPU is not necessarily faster; measure performance on your dataset. Duration, automatic F0, and vocoder weights remain fixed. Training targets come from dry WAV audio; no teacher voicebank or teacher model's internal features are required. Pitch is extracted from the WAV and phoneme boundaries are estimated by the base model. This does not replace phoneme-level forced alignment, and passing the checks does not guarantee correct lyrics or alignment for every phoneme.
 
-**Save and stop** saves after the current step. To resume, enter the original work directory, set a higher total target in epochs or steps (not an additional amount), and click **Resume training**. You can switch between CPU and CUDA when resuming. Outputs include `run/latest.pt` (checkpoint), `run/trained-base.dnni` (acoustic model), and `trained-*.nofs` (voicebank). Providing a preview project also generates a WAV. Closing the browser does not stop training.
+**Save and stop** saves after the current step. To resume, enter the original work directory, set a higher total target in epochs or steps (not an additional amount), and click **Resume training**. You can switch between CPU, CUDA, and MPS when resuming. Outputs include `run/latest.pt` (checkpoint), `run/trained-base.dnni` (acoustic model), and `trained-*.nofs` (voicebank). Providing a preview project also generates a WAV. Closing the browser does not stop training.
 
 ## CLI
 
@@ -82,3 +82,11 @@ Rendering uses note pitch; automatic F0, parameter curves, referenced groups, an
 ## License
 
 [GPL-3.0](LICENSE)
+
+## macOS / Apple MPS
+
+On an MPS-capable Mac, use the default dependencies (no CUDA extra). The GUI detects and enables **Apple GPU (MPS)**; CPU remains the default. Add `--device mps` to `opensv train`. On macOS the engine path is `./target/release/opensv`, without `.exe`.
+
+The acoustic network runs on MPS. For WAV supervision, the fixed vocoder and spectral loss stay on CPU to preserve the existing float64 and complex FFT algorithms; differentiable device transfers carry gradients back to MPS. Feature-supervised prediction and loss run on MPS. Preparation, export and `train-components` remain CPU-only. Checkpoints can resume across CPU, CUDA and MPS, with possible floating-point differences.
+
+Benchmark on your dataset: this hybrid path is not guaranteed to outperform CPU. Unavailable MPS and out-of-memory failures produce explicit errors, not silent device switches. `PYTORCH_ENABLE_MPS_FALLBACK` is not required; do not disable MPS memory safety limits.

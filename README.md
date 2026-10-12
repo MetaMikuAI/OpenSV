@@ -38,9 +38,9 @@ uv run --project training --locked --no-group cpu --extra cuda opensv-gui
 
 WAV 应从工程零点导出并保留前导静音，不带伴奏、混响或叠唱。每份工程仅接受一条有效歌声轨道，SVP 引用组需先合并；单份工程最长 10 分钟。**音频偏移通常填 0**；若裁掉开头 0.5 秒，填 `-0.5`，若额外添加 0.5 秒静音，填 `0.5`。
 
-干声 WAV 声学训练可选择 CPU 或 NVIDIA CUDA，默认 CPU；数据准备与声库导出仍使用 CPU。GPU 不一定更快，需按实际数据集测量。时长、自动 F0 和声码器权重保持不变。目标来自干声 WAV，无需老师声库或老师模型的中间特征。音高从 WAV 提取，音素边界由底模估计；它不替代逐音素强制对齐，检查通过也不能保证歌词和每个音素完全对应。
+干声 WAV 声学训练可选择 CPU、NVIDIA CUDA 或 Apple MPS，默认 CPU；数据准备与声库导出仍使用 CPU。GPU 不一定更快，需按实际数据集测量。时长、自动 F0 和声码器权重保持不变。目标来自干声 WAV，无需老师声库或老师模型的中间特征。音高从 WAV 提取，音素边界由底模估计；它不替代逐音素强制对齐，检查通过也不能保证歌词和每个音素完全对应。
 
-“保存并停止”会在当前步骤结束后保存。续训时填写原工作目录和更大的累计目标轮数或步数（不是本次追加量），再点击“从工作目录续训”；续训可切换 CPU／CUDA。结果保存在工作目录，包括 `run/latest.pt` 检查点、`run/trained-base.dnni` 声学模型和 `trained-*.nofs` 声库；填写试听工程后还会生成 WAV。关闭网页不会停止任务。
+“保存并停止”会在当前步骤结束后保存。续训时填写原工作目录和更大的累计目标轮数或步数（不是本次追加量），再点击“从工作目录续训”；续训可切换 CPU／CUDA／MPS。结果保存在工作目录，包括 `run/latest.pt` 检查点、`run/trained-base.dnni` 声学模型和 `trained-*.nofs` 声库；填写试听工程后还会生成 WAV。关闭网页不会停止任务。
 
 ## 命令行
 
@@ -82,3 +82,15 @@ opensv render --voice trained.nofs --project song.svp --output song.wav --langua
 ## 许可证
 
 [GPL-3.0](LICENSE)
+
+## macOS / Apple MPS
+
+支持 MPS 的 Mac 可使用默认依赖，无需 CUDA extra。训练界面会自动检测并启用“Apple GPU（MPS）”；默认仍选择 CPU。命令行在训练参数中增加 `--device mps`，例如：
+
+```bash
+uv run --project training --locked ./target/release/opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/mps-demo --steps 100 --device mps
+```
+
+MPS 运行声学网络；WAV 监督的固定声码器与频谱损失仍在 CPU 上计算，以保留现有双精度与复数 FFT 算法。跨设备拷贝保留梯度，不会断开训练。特征监督的预测和损失均在 MPS 上计算。数据准备、导出和 `train-components` 仍使用 CPU。CPU／CUDA／MPS 之间可以续训，但不同后端可能存在浮点差异。
+
+此混合路径不保证比 CPU 更快，请用同一数据集比较每步耗时。MPS 不可用或内存不足会明确报错，不会静默切换设备；不需要设置 `PYTORCH_ENABLE_MPS_FALLBACK`。不要关闭 MPS 内存安全限制来规避内存不足。

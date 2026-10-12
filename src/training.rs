@@ -22,7 +22,7 @@ pub struct TrainArgs {
     seconds: u32,
     #[arg(long, default_value_t = 4)]
     threads: u32,
-    #[arg(long, default_value = "cpu", value_parser = ["cpu", "cuda"])]
+    #[arg(long, default_value = "cpu", value_parser = ["cpu", "cuda", "mps"])]
     device: String,
     #[arg(long, default_value_t = 25)]
     save_every: u32,

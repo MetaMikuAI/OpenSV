@@ -51,7 +51,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}[hidden]{display:none!important
 <p id="training-target" class="hint">检查切分后，将按训练片段数换算总步数。</p>
 <p class="hint">训练声学网络；时长、自动音高和声码器保持固定。时间限制不包含数据准备与导出。</p>
 <div class="row"><label>试听工程（选填）<input name="preview" placeholder="使用未参与训练的 song.svp"></label><label>试听语言<select name="preview_language"><option value="">跟随材料语言</option><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label></div>
-<div class="row"><label>材料语言<select name="language"><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label><label>训练设备<select name="device"><option value="cpu">CPU</option><option value="cuda" disabled>NVIDIA GPU（CUDA）</option></select></label></div>
+<div class="row"><label>材料语言<select name="language"><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label><label>训练设备<select name="device"><option value="cpu">CPU</option><option value="cuda" disabled>NVIDIA GPU（CUDA）</option><option value="mps" disabled>Apple GPU（MPS）</option></select></label></div>
 <p id="device-status" class="hint">正在检测训练设备…</p>
 <div class="row"><label>学习率<input name="lr" type="number" step="any" value="0.000001" min="0.000000001" max="1"><input id="lr-slider" aria-label="学习率滑条" type="range" min="-7" max="-3" step="0.1" value="-6"><span class="quiet">0.0000001 — 0.001，可直接输入数值</span></label><label>CPU 线程<input name="threads" type="number" min="1" max="256" value="4"></label></div>
 <details><summary>高级设置</summary>
@@ -120,7 +120,7 @@ steps:['累计目标步数。续训到 200 步时填 200，而不是本次新增
 epochs:['完整学习一遍训练材料就是一轮。续训时填写累计目标，例如从 2 轮继续到 5 轮，填 5。','One epoch is one pass through all training clips. Enter the cumulative target when resuming: to continue from 2 to 5 epochs, enter 5.'],
 seconds:['限制训练进程的本次运行时间，每步结束后检查并保存；数据切分和声库导出另计。','Limits the training process this run. The limit is checked between steps and progress is saved; data preparation and voice export are separate.'],
 threads:['CPU 运算使用的线程数。GPU 训练仍有部分数据处理在 CPU 上完成。','Threads for CPU operations. GPU training still uses the CPU for some data processing.'],
-device:['默认使用 CPU。NVIDIA GPU 需要支持 CUDA 的 PyTorch 与显卡驱动；数据准备和声库导出仍使用 CPU。','CPU is the default. NVIDIA GPU training requires CUDA-enabled PyTorch and a compatible driver. Preparation and voice export still use the CPU.'],
+device:['默认使用 CPU。NVIDIA GPU 需要支持 CUDA 的 PyTorch 与显卡驱动；MPS 使用 Apple GPU 训练声学网络，声码器和频谱损失仍使用 CPU；数据准备和声库导出仍使用 CPU。','CPU is the default. NVIDIA GPU training requires CUDA-enabled PyTorch and a compatible driver. MPS trains the acoustic network on the Apple GPU, with the vocoder and spectral loss on CPU. Preparation and voice export still use the CPU.'],
 preview:['可选的独立 SVP 工程，训练结束后用导出的声库渲染试听。','Optional independent SVP score, rendered with the exported voice after training.'],
 preview_language:['仅用于试听，不改变训练材料语言。日语汉字读音不能自动猜测，可用自定义词典或显式音素指定。','Used only for previews; does not change the training material language. Japanese kanji readings are not inferred automatically; specify them with a custom dictionary or explicit phonemes.']
 };
@@ -131,14 +131,14 @@ Object.assign(translations,{
 '试听语言':'Preview language','跟随材料语言':'Use material language',
 '试听语言必须为中文或日语，或跟随材料语言':'Preview language must be Mandarin, Japanese, or the material language.',
 '赛博佛祖':'Cyber Buddha','佛祖保佑，梯度不炸，Loss 下降。':'May Buddha bless our gradients and keep the loss going down.',
-'本地运行':'Local','训练设备':'Training device','NVIDIA GPU（CUDA）':'NVIDIA GPU (CUDA)','正在检测训练设备…':'Checking training devices…',
+'本地运行':'Local','训练设备':'Training device','NVIDIA GPU（CUDA）':'NVIDIA GPU (CUDA)','Apple GPU（MPS）':'Apple GPU (MPS)','CPU 与 Apple GPU（MPS）均可选；声码器与频谱损失使用 CPU。':'CPU and Apple GPU (MPS) are available; the vocoder and spectral loss use CPU.','正在检测训练设备…':'Checking training devices…',
 'CPU 与 NVIDIA GPU 均可选。':'CPU and NVIDIA GPU are available.',
 '当前 PyTorch 仅支持 CPU，请先安装支持 CUDA 的 PyTorch':'This PyTorch build is CPU-only. Install a CUDA-enabled build first.',
 '未检测到可用的 NVIDIA GPU 或驱动':'No usable NVIDIA GPU or driver was detected.',
 'PyTorch 加载失败，请检查训练环境':'Could not load PyTorch. Check the training environment.',
 '显存不足。请关闭占用显卡的程序、缩短音频片段，或选择 CPU。':'GPU memory is insufficient. Close other GPU applications, use shorter audio segments, or choose CPU.',
 'CUDA 不可用。请安装 CUDA 版 PyTorch 并检查 NVIDIA 驱动，或选择 CPU。':'CUDA is unavailable. Install a CUDA-enabled PyTorch build and check the NVIDIA driver, or choose CPU.',
-'训练设备必须为 cpu 或 cuda':'Training device must be cpu or cuda.',
+'训练设备必须为 cpu、cuda 或 mps':'Training device must be cpu, cuda or mps.',
 '训练轮数必须为大于 0 的有限数值':'Training epochs must be a finite number greater than 0.',
 '数据集中没有训练片段':'The dataset contains no training clips.',
 '缺少数据集清单，请先完成检查并切分':'Dataset manifest missing. Complete Check and split first.',
@@ -269,7 +269,7 @@ async function play(path){try{const r=await fetch(path,{headers:{'X-OpenSV-Token
 async function start(action){try{showMessage('error','');const result=await api(action,values());for(const id of ['epoch','step','train-loss','loss','best'])$(id).textContent='—';$('progress').value=0;$('audio').hidden=true;$('review').textContent='';$('segments').hidden=true;paint(result)}catch(e){showMessage('error',e.message)}}
 form.onsubmit=e=>{e.preventDefault();start('start')};$('prepare').onclick=()=>{$('confirm').checked=false;start('prepare')};$('resume').onclick=()=>start('resume');$('stop').onclick=()=>api('stop',{}).then(paint).catch(e=>showMessage('error',e.message));$('segments').onchange=()=>play('/api/audio?segment='+encodeURIComponent($('segments').value));
 $('mode').onchange=()=>{const pair=$('mode').value==='pair';$('pair-fields').hidden=!pair;$('dataset-fields').hidden=pair;$('prepare').hidden=!pair;$('confirmation').hidden=!pair};
-api('defaults').then(d=>{if(!form.elements.engine.value)form.elements.engine.value=d.engine;form.elements.device.querySelector('[value=cuda]').disabled=!d.cuda_available;showMessage('device-status',d.cuda_available?'CPU 与 NVIDIA GPU 均可选。':d.cuda_reason)}).catch(e=>showMessage('device-status',e.message));
+api('defaults').then(d=>{if(!form.elements.engine.value)form.elements.engine.value=d.engine;for(const device of ['cuda','mps'])form.elements.device.querySelector(`[value=${device}]`).disabled=!d[device+'_available'];showMessage('device-status',d.mps_available?'CPU 与 Apple GPU（MPS）均可选；声码器与频谱损失使用 CPU。':d.cuda_available?'CPU 与 NVIDIA GPU 均可选。':d.cuda_reason)}).catch(e=>showMessage('device-status',e.message));
 $('training-unit').onchange=()=>{const unit=$('training-unit').value,count=trainCount();if(count){if(unit==='steps')form.elements.steps.value=Math.ceil(Number(form.elements.epochs.value)*count);else form.elements.epochs.value=Number(form.elements.steps.value)/count}setUnit(unit)};form.addEventListener('input',updateTarget);
 $('lr-slider').oninput=()=>form.elements.lr.value=Number((10**Number($('lr-slider').value)).toPrecision(3));form.elements.lr.oninput=()=>$('lr-slider').value=Math.log10(Number(form.elements.lr.value));
 $('check-engine').onclick=async()=>{try{showMessage('engine-status','正在检查…');showMessage('engine-status',(await api('engine',{engine:form.elements.engine.value})).message)}catch(e){showMessage('engine-status',e.message)}};

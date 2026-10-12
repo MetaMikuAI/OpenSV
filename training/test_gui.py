@@ -26,7 +26,8 @@ class GuiTests(unittest.TestCase):
     def test_device_options_report_pytorch_capabilities(self):
         for available, version in ((True, "12.8"), (False, "12.8"), (False, None)):
             torch = SimpleNamespace(version=SimpleNamespace(cuda=version),
-                                    cuda=SimpleNamespace(is_available=lambda: available))
+                                    cuda=SimpleNamespace(is_available=lambda: available),
+                                    backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda: False)))
             with self.subTest(available=available, version=version), patch.dict("sys.modules", {"torch": torch}):
                 result = device_options()
             self.assertEqual(result["cuda_available"], available)
@@ -44,6 +45,29 @@ class GuiTests(unittest.TestCase):
                     patch("opensv_train.gui.threading.Thread") as worker:
                 with self.assertRaisesRegex(ValueError, "CUDA 不可用：CPU only"):
                     jobs.start(dict(output=str(output), device="cuda", mode="dataset"))
+                worker.assert_not_called()
+            self.assertFalse(output.exists())
+            self.assertFalse(jobs.snapshot()["busy"])
+
+    def test_mps_device_options(self):
+        torch = SimpleNamespace(version=SimpleNamespace(cuda=None),
+                                cuda=SimpleNamespace(is_available=lambda: False),
+                                backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda: True)))
+        with patch.dict("sys.modules", {"torch": torch}):
+            result = device_options()
+        self.assertEqual(result["devices"], ["cpu", "mps"])
+        self.assertTrue(result["mps_available"])
+        self.assertEqual(result["mps_reason"], "")
+        self.assertEqual(configuration(dict(device="mps", output="job"))["device"], "mps")
+
+    def test_unavailable_mps_is_rejected_before_creating_job(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "job"
+            jobs = Jobs()
+            with patch("opensv_train.gui.device_options", return_value=dict(mps_available=False, mps_reason="No Metal")), \
+                    patch("opensv_train.gui.threading.Thread") as worker:
+                with self.assertRaisesRegex(ValueError, "MPS 不可用：No Metal"):
+                    jobs.start(dict(output=str(output), device="mps", mode="dataset"))
                 worker.assert_not_called()
             self.assertFalse(output.exists())
             self.assertFalse(jobs.snapshot()["busy"])
@@ -112,7 +136,7 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(jobs.snapshot()["config"], saved)
 
     def test_resume_uses_total_epochs_and_preserves_legacy_steps(self):
-        for epochs, steps, previous_device, device in ((3, 9, "cpu", "cuda"), (None, 7, "cuda", "cpu"),
+        for epochs, steps, previous_device, device in ((3, 9, "cpu", "cuda"), (3, 9, "cpu", "mps"), (None, 7, "mps", "cpu"), (None, 7, "cuda", "cpu"),
                                                        (None, 7, "cuda", None), (None, 7, None, None)):
             with self.subTest(epochs=epochs, device=device, previous_device=previous_device), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
@@ -134,19 +158,19 @@ class GuiTests(unittest.TestCase):
                 jobs.log('{"event":"step","step":1,"loss":100}')
                 values = dict(output=directory, epochs=epochs, steps=7, lr=0.1,
                               engine=str(root / "base_model.dnni"), preview=str(engine), preview_language="japanese",
-                              preview_dictionary=str(engine))
+                              preview_dictionary=str(engine.resolve()))
                 if device:
                     values["device"] = device
                 with patch("opensv_train.gui.threading.Thread") as worker, \
-                        patch("opensv_train.gui.device_options", return_value=dict(cuda_available=True)):
+                        patch("opensv_train.gui.device_options", return_value=dict(cuda_available=True, mps_available=True)):
                     jobs.start(values, resume=True)
                 self.assertFalse(jobs.losses)
                 resumed = worker.call_args.kwargs["args"][0]
                 self.assertEqual(resumed["language"], "mandarin")
                 self.assertEqual(resumed["preview_language"], "japanese")
-                self.assertEqual(resumed["preview"], str(engine))
-                self.assertEqual(resumed["engine"], values["engine"])
-                self.assertEqual(resumed["preview_dictionary"], str(engine))
+                self.assertEqual(resumed["preview"], str(engine.resolve()))
+                self.assertEqual(resumed["engine"], str(Path(values["engine"]).resolve()))
+                self.assertEqual(resumed["preview_dictionary"], str(engine.resolve()))
                 self.assertEqual(resumed["dictionary"], "")
                 with patch.object(jobs, "command", return_value=0) as command:
                     jobs.run(resumed, resume=True)
@@ -321,16 +345,16 @@ class GuiTests(unittest.TestCase):
             jobs = Jobs()
             with patch("opensv_train.gui.threading.Thread") as worker:
                 jobs.start(dict(config, confirm_alignment=True, engine=str(dataset.parent / "base_model.dnni"),
-                                preview=str(source), preview_language="japanese", preview_dictionary=str(source)))
+                                preview=str(source), preview_language="japanese", preview_dictionary=str(source.resolve())))
                 worker.return_value.start.assert_called_once()
             self.assertTrue(jobs.snapshot()["busy"])
             self.assertEqual(jobs.snapshot()["config"]["steps"], 6)
             self.assertEqual(jobs.snapshot()["config"]["language"], "mandarin")
             self.assertEqual(jobs.snapshot()["config"]["preview_language"], "japanese")
-            self.assertEqual(jobs.snapshot()["config"]["preview"], str(source))
-            self.assertEqual(jobs.snapshot()["config"]["preview_dictionary"], str(source))
+            self.assertEqual(jobs.snapshot()["config"]["preview"], str(source.resolve()))
+            self.assertEqual(jobs.snapshot()["config"]["preview_dictionary"], str(source.resolve()))
             self.assertEqual(jobs.snapshot()["config"]["dictionary"], "")
-            self.assertEqual(jobs.snapshot()["config"]["engine"], str(dataset.parent / "base_model.dnni"))
+            self.assertEqual(jobs.snapshot()["config"]["engine"], str((dataset.parent / "base_model.dnni").resolve()))
             self.assertFalse((root / "run").exists())
 
     def test_missing_job_prevents_resume(self):
