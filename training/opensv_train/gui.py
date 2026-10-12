@@ -120,7 +120,9 @@ class Jobs:
         self.lock = threading.RLock()
         self.worker = None
         self.stop_file = None
-        self.losses = deque(maxlen=20)
+        self.history_path = None
+        self.loss_window = deque(maxlen=20)
+        self.checkpoint_window = None
         self.state = {"busy": False, "phase": "idle", "logs": [], "artifacts": []}
 
     def snapshot(self):
@@ -131,16 +133,46 @@ class Jobs:
         with self.lock:
             self.state.update(values)
 
-    def log(self, line):
+    def log(self, line, persist=True):
         with self.lock:
             self.state["logs"].append(line)
             self.state["logs"] = self.state["logs"][-400:]
             try:
                 event = json.loads(line)
                 if isinstance(event, dict) and "event" in event:
-                    if event["event"] == "step" and isinstance(event.get("loss"), (int, float)) and math.isfinite(event["loss"]):
-                        self.losses.append(event["loss"])
-                        event["loss_average"] = sum(self.losses) / len(self.losses)
+                    kind = event["event"]
+                    step = event.get("step")
+                    if kind in ("ready", "step", "checkpoint"):
+                        if not isinstance(step, int) or isinstance(step, bool) or step < 0:
+                            return event
+                        for key in ("loss", "validation_loss"):
+                            if key in event and (not isinstance(event[key], (int, float)) or not math.isfinite(event[key])):
+                                return event
+                        if kind == "ready":
+                            if self.checkpoint_window and self.checkpoint_window[0] == step:
+                                self.loss_window = deque(self.checkpoint_window[1], maxlen=20)
+                            else:
+                                self.loss_window = deque(((n, v) for n, v in self.loss_window if n <= step), maxlen=20)
+                        elif kind == "step" and "loss" in event:
+                            # Only consecutive raw steps contribute; never average sampled chart points.
+                            if self.loss_window and self.loss_window[-1][0] != step - 1:
+                                self.loss_window.clear()
+                            self.loss_window.append((step, event["loss"]))
+                            event["loss_average"] = sum(v for _, v in self.loss_window) / len(self.loss_window)
+                        elif kind == "checkpoint":
+                            self.checkpoint_window = (step, list(self.loss_window))
+                        if persist and self.history_path is not None:
+                            with self.history_path.open("a", encoding="utf-8") as stream:
+                                # A leading newline isolates any torn final record after a crash.
+                                stream.write("\n" + json.dumps(event, ensure_ascii=False) + "\n")
+                        if kind == "ready":
+                            # A crashed run may have logged steps beyond latest.pt.
+                            history = [p for p in self.state.get("history", []) if p["step"] <= step]
+                            self.state["history"] = history
+                            metrics = {}
+                            for point in history:
+                                metrics.update(point)
+                            self.state["metrics"] = metrics
                     self.state["event"] = event
                     metrics = self.state.setdefault("metrics", {})
                     metrics.update({k: event[k] for k in ("step", "loss", "loss_average", "validation_loss", "best_step", "train_samples") if k in event})
@@ -232,9 +264,28 @@ class Jobs:
             (root / "gui.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
             self.stop_file = root / "stop.request"
             self.stop_file.unlink(missing_ok=True)
+            previous = self.state if resume and self.state.get("output") == str(root) else None
+            self.history_path = None
+            self.loss_window.clear()
+            self.checkpoint_window = None
             self.state = {"busy": True, "phase": "starting", "logs": [], "artifacts": [],
                           "output": str(root), "preparation": preparation, "config": config}
-            self.losses.clear()
+            history_path = root / "training-history.jsonl"
+            if resume and history_path.is_file():
+                with history_path.open(encoding="utf-8", errors="replace") as stream:
+                    for line in stream:
+                        if line.strip():
+                            self.log(line.rstrip(), persist=False)
+            elif previous:
+                # Older GUI sessions only kept sampled history in memory.
+                for point in previous.get("history", []):
+                    event = dict(point, event="step" if "loss" in point else "checkpoint")
+                    self.log(json.dumps(event), persist=False)
+                with history_path.open("a", encoding="utf-8") as stream:
+                    for point in previous.get("history", []):
+                        event = dict(point, event="step" if "loss" in point else "checkpoint")
+                        stream.write(json.dumps(event) + "\n")
+            self.history_path = history_path
             self.worker = threading.Thread(target=self.run, args=(config, resume, prepare), daemon=False)
             self.worker.start()
 

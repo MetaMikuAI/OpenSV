@@ -84,7 +84,7 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(state["metrics"]["loss_average"], 2.5)
         self.assertEqual(len(state["history"]), 2)
 
-    def test_average_uses_last_twenty_steps_after_history_downsampling(self):
+    def test_raw_loss_survives_history_downsampling(self):
         jobs = Jobs()
         for step in range(1, 2022):
             jobs.log(json.dumps(dict(event="step", step=step, loss=float(step))))
@@ -92,7 +92,90 @@ class GuiTests(unittest.TestCase):
         self.assertLess(len(state["history"]), 2000)
         self.assertEqual(state["metrics"]["loss"], 2021)
         self.assertEqual(state["metrics"]["loss_average"], 2011.5)
-        self.assertEqual(state["history"][-1]["loss_average"], 2011.5)
+        self.assertEqual(state["history"][-1]["loss"], 2021)
+
+    def test_raw_history_persists_and_replays_checkpoint_rollback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "training-history.jsonl"
+            jobs = Jobs()
+            jobs.history_path = path
+            for event in [dict(event="step", step=1, loss=10),
+                          dict(event="checkpoint", step=1, validation_loss=5),
+                          dict(event="step", step=2, loss=20),
+                          dict(event="ready", step=1, train_samples=3),
+                          dict(event="step", step=2, loss=7)]:
+                jobs.log(json.dumps(event))
+            restored = Jobs()
+            before = path.read_bytes()
+            for line in path.read_text().splitlines():
+                restored.log(line, persist=False)
+            self.assertEqual(path.read_bytes(), before)
+            self.assertEqual(restored.snapshot()["history"], jobs.snapshot()["history"])
+            self.assertEqual([p["loss"] for p in restored.snapshot()["history"] if "loss" in p], [10, 7])
+            self.assertEqual(restored.snapshot()["metrics"]["loss"], 7)
+            self.assertEqual(restored.snapshot()["metrics"]["validation_loss"], 5)
+
+    def test_history_append_recovers_after_truncated_record(self):
+        with tempfile.TemporaryDirectory() as directory:
+            jobs = Jobs()
+            jobs.history_path = Path(directory) / "training-history.jsonl"
+            jobs.history_path.write_text('{"event":', encoding="utf-8")
+            jobs.log('{"event":"step","step":2,"loss":3}')
+            restored = Jobs()
+            for line in jobs.history_path.read_text().splitlines():
+                restored.log(line, persist=False)
+            self.assertEqual(restored.snapshot()["history"], [dict(step=2, loss=3, loss_average=3)])
+
+    def test_resume_migrates_same_directory_in_memory_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            dataset = self.write_dataset(root / "dataset")
+            engine = root / "engine"
+            engine.touch()
+            (root / "run").mkdir()
+            (root / "run/latest.pt").touch()
+            config = configuration(dict(output=str(root), engine=str(engine), voice=str(root),
+                                        dataset=str(dataset), epochs=None, steps=6))
+            (root / "gui.json").write_text(json.dumps(config), encoding="utf-8")
+            jobs = Jobs()
+            jobs.update(output=str(root))
+            jobs.log('{"event":"step","step":3,"loss":8}')
+            with patch("opensv_train.gui.threading.Thread"):
+                jobs.start(dict(output=str(root), epochs=None, steps=7), resume=True)
+            self.assertEqual(jobs.snapshot()["history"], [dict(step=3, loss=8, loss_average=8)])
+            saved = (root / "training-history.jsonl").read_text()
+            self.assertEqual(json.loads(saved)["loss"], 8)
+            jobs.log('{"event":"ready","step":3,"train_samples":3}')
+            jobs.log('{"event":"step","step":4,"loss":2}')
+            self.assertEqual([p["loss"] for p in jobs.snapshot()["history"]], [8, 2])
+
+    def test_smoothing_restores_full_window_after_checkpoint_rollback(self):
+        jobs = Jobs()
+        events = [dict(event="step", step=n, loss=float(n)) for n in range(1, 2101)]
+        events += [dict(event="checkpoint", step=2100, validation_loss=1)]
+        events += [dict(event="step", step=n, loss=9999.) for n in range(2101, 2151)]
+        events += [dict(event="ready", step=2100), dict(event="step", step=2101, loss=2101.)]
+        with tempfile.TemporaryDirectory() as directory:
+            jobs.history_path = Path(directory) / "training-history.jsonl"
+            for event in events:
+                jobs.log(json.dumps(event))
+            restored = Jobs()
+            for line in jobs.history_path.read_text().splitlines():
+                restored.log(line, persist=False)
+        for state in (jobs.snapshot(), restored.snapshot()):
+            self.assertEqual(state["metrics"]["loss"], 2101)
+            self.assertEqual(state["metrics"]["loss_average"], 2091.5)
+            self.assertLess(len(state["history"]), 2000)
+            self.assertEqual(state["history"][-1]["loss_average"], 2091.5)
+
+    def test_smoothing_ignores_checkpoints_and_restarts_after_missing_steps(self):
+        jobs = Jobs()
+        jobs.log('{"event":"step","step":1,"loss":2}')
+        jobs.log('{"event":"checkpoint","step":1,"validation_loss":100}')
+        jobs.log('{"event":"step","step":2,"loss":6}')
+        self.assertEqual(jobs.snapshot()["metrics"]["loss_average"], 4)
+        jobs.log('{"event":"step","step":4,"loss":10}')
+        self.assertEqual(jobs.snapshot()["metrics"]["loss_average"], 10)
 
     def test_epochs_count_only_training_samples(self):
         config = configuration(dict(output="run", epochs=2))
@@ -154,6 +237,7 @@ class GuiTests(unittest.TestCase):
                 else:
                     config.pop("device")
                 (root / "gui.json").write_text(json.dumps(config), encoding="utf-8")
+                (root / "training-history.jsonl").write_text('{"event":"step","step":6,"loss":2.5}\n{truncated', encoding="utf-8")
                 jobs = Jobs()
                 jobs.log('{"event":"step","step":1,"loss":100}')
                 values = dict(output=directory, epochs=epochs, steps=7, lr=0.1,
@@ -164,7 +248,8 @@ class GuiTests(unittest.TestCase):
                 with patch("opensv_train.gui.threading.Thread") as worker, \
                         patch("opensv_train.gui.device_options", return_value=dict(cuda_available=True, mps_available=True)):
                     jobs.start(values, resume=True)
-                self.assertFalse(jobs.losses)
+                self.assertEqual(jobs.snapshot()["metrics"]["loss"], 2.5)
+                self.assertEqual(jobs.snapshot()["history"][0]["step"], 6)
                 resumed = worker.call_args.kwargs["args"][0]
                 self.assertEqual(resumed["language"], "mandarin")
                 self.assertEqual(resumed["preview_language"], "japanese")

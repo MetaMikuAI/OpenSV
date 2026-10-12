@@ -34,7 +34,7 @@ The interface runs in your local browser and supports Chinese and English. Inter
 3. Select the material language (Mandarin or Japanese) and provide the base voice's pronunciation dictionary when needed. Click **Check and split**, review the messages, and listen to the segments.
 4. Confirm that the materials match, set the total target epochs, and start training. Advanced settings let you switch to total steps. Each epoch is converted to steps using the number of training clips, with batch size fixed at 1; the interface shows epochs and the resulting total steps.
 
-Training loss shows the average of the latest 20 steps, using available records if fewer than 20 have been recorded. Raw per-step loss remains in the log. Validation loss is measured on a fixed held-out set and updates at checkpoints, showing performance on material not used for training.
+The training-loss metric shows the raw current-step value. The chart retains the raw curve and overlays a trailing 20-step mean (using available consecutive records during warm-up). Smoothing uses full per-step records, survives resume, and is independent of chart sampling. GUI training history is stored in `training-history.jsonl` and reloaded on resume. Long curves are sampled for display; the file retains all raw values. Validation loss is measured on a fixed held-out set and updates at checkpoints, showing performance on material not used for training.
 
 Export each WAV from the project's zero point, keeping any leading silence. Use a single dry vocal without backing music, reverb, or layered voices. Each project must contain only one active vocal track; merge referenced groups in SVP first. Each project can be up to 10 minutes long. **Audio offset is normally 0**: enter `-0.5` if you trimmed 0.5 seconds from the beginning, or `0.5` if you added 0.5 seconds of silence.
 
@@ -90,3 +90,5 @@ On an MPS-capable Mac, use the default dependencies (no CUDA extra). The GUI det
 The acoustic network runs on MPS. For WAV supervision, the fixed vocoder and spectral loss stay on CPU to preserve the existing float64 and complex FFT algorithms; differentiable device transfers carry gradients back to MPS. Feature-supervised prediction and loss run on MPS. Preparation, export and `train-components` remain CPU-only. Checkpoints can resume across CPU, CUDA and MPS, with possible floating-point differences.
 
 Benchmark on your dataset: this hybrid path is not guaranteed to outperform CPU. Unavailable MPS and out-of-memory failures produce explicit errors, not silent device switches. `PYTORCH_ENABLE_MPS_FALLBACK` is not required; do not disable MPS memory safety limits.
+
+History compatibility: older versions did not persist curves. Resuming in the same GUI service migrates any retained in-memory history for that work directory. If the old service has exited and no `training-history.jsonl` exists, past per-step losses cannot be recovered; recording starts with subsequent training.

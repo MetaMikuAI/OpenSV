@@ -24,7 +24,7 @@ button{cursor:pointer;border:0;border-radius:7px;padding:9px 12px;font:inherit;b
 .hint,.footer{font-size:12px;line-height:1.6;color:#748179}.hint{margin:6px 0 10px}.footer{margin:8px 0}.quiet{font-size:11px;color:#829287}
 details{margin-top:10px}summary{cursor:pointer;font-size:12px;color:#748179}.engine-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}.engine-row label{margin:0}.engine-row button{height:32px}#engine-status{margin:6px 0 10px}
 .status{font-size:21px;margin:6px 0 10px}progress{width:100%;height:6px;accent-color:#527e65}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.metric{padding:10px 0;border-bottom:1px solid #eef0eb}.metric span{color:#748179}.metric strong{display:block;margin-top:4px;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
-.chart{width:100%;height:170px;margin:10px 0 0;border-radius:8px;background:#f7f9f6}.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;margin:6px 0 10px}.legend span:first-child{color:#3c8365}.legend span:last-child{color:#b97e3e}
+.chart{width:100%;height:170px;margin:10px 0 0;border-radius:8px;background:#f7f9f6}.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;margin:6px 0 10px}.legend span:first-child{color:#8baa9b}.legend span:nth-child(2){color:#3c8365}.legend span:last-child{color:#b97e3e}
 pre{white-space:pre-wrap;overflow:auto;max-height:220px;font-size:11px;color:#718079;line-height:1.6}#error{color:#a13e39;white-space:pre-wrap}#artifacts{font-size:12px;overflow-wrap:anywhere;line-height:1.8}audio{width:100%;margin-top:12px}
 .help{display:inline-block;margin-left:4px;color:#748179;cursor:help;font-size:11px;border:1px solid #cedcd1;border-radius:50%;width:15px;height:15px;text-align:center;line-height:13px;flex-shrink:0}
 .blessing{border-top:1px solid #eef0eb;padding-top:10px}.blessing figure{margin:12px 0 0;text-align:center}.blessing pre{display:inline-block;max-width:100%;max-height:none;margin:0;white-space:pre;text-align:left;font-family:Consolas,"Courier New",monospace;font-size:14px;line-height:1.2;color:#9a8251}.blessing figcaption{margin-top:8px;font-size:12px;color:#8a7857}
@@ -69,11 +69,11 @@ fieldset{border:0;padding:0;margin:0;min-width:0}[hidden]{display:none!important
 </form>
 <aside><section class="card"><h2><b>03</b>进度与结果</h2><div class="status" id="status">准备就绪</div><progress id="progress" max="100" value="0"></progress>
 <div class="metrics"><div class="metric"><span>已完成轮数</span><strong id="epoch">—</strong><small id="step">—</small></div>
-<div class="metric"><span>训练误差 · 最近 20 步平均</span><strong id="train-loss">—</strong></div>
+<div class="metric"><span>训练误差 · 当前步</span><strong id="train-loss">—</strong></div>
 <div class="metric"><span>验证误差</span><strong id="loss">—</strong></div>
 <div class="metric"><span>最优检查点</span><strong id="best">—</strong></div></div>
-<svg id="chart" class="chart" viewBox="0 0 480 190" role="img" aria-label="训练与验证误差曲线"></svg><div class="legend"><span>● 训练误差 · 20 步平均</span><span>● 验证误差 · 检查点</span></div>
-<p class="hint">平均值用于观察趋势，不足 20 步时按已有记录计算。原始逐步误差保留在日志中。</p>
+<svg id="chart" class="chart" viewBox="0 0 480 190" role="img" aria-label="训练与验证误差曲线"></svg><div class="legend"><span>● 训练误差 · 逐步原值</span><span>● 训练误差 · 最近 20 步平均</span><span>● 验证误差 · 检查点</span></div>
+<p class="hint">保留每步原始误差，并叠加最近 20 步平均曲线（不足 20 步使用已有连续记录）；续训恢复历史曲线与平滑窗口。长曲线抽样显示，完整原值保存在 training-history.jsonl。</p>
 <p class="hint">每秒刷新。验证在每 25 步及结束时执行；导出验证误差最低的模型。</p>
 <p id="error" role="alert"></p><div id="review" style="font-size:12px;white-space:pre-wrap;line-height:1.8"></div><select id="segments" aria-label="切分试听" hidden></select><div id="artifacts"></div><audio id="audio" controls hidden></audio>
 <details><summary>运行日志</summary><pre id="logs"></pre></details>
@@ -145,9 +145,10 @@ Object.assign(translations,{
 '数据集清单格式无效':'Invalid dataset manifest.',
 '训练目标不能超过 10000000 步，请减少训练轮数':'The target exceeds 10,000,000 steps. Reduce the number of epochs.',
 '累计训练轮数':'Total training epochs','已完成轮数':'Completed epochs',
-'训练误差 · 最近 20 步平均':'Training loss · last 20 steps',
-'● 训练误差 · 20 步平均':'● Training · 20-step average',
-'平均值用于观察趋势，不足 20 步时按已有记录计算。原始逐步误差保留在日志中。':'The average shows the trend, using available records until 20 steps are reached. Raw per-step loss remains in the log.',
+'训练误差 · 当前步':'Training loss · current step',
+'● 训练误差 · 逐步原值':'● Training · raw per-step loss',
+'● 训练误差 · 最近 20 步平均':'● Training · last 20-step average',
+'保留每步原始误差，并叠加最近 20 步平均曲线（不足 20 步使用已有连续记录）；续训恢复历史曲线与平滑窗口。长曲线抽样显示，完整原值保存在 training-history.jsonl。':'Keeps raw per-step loss and overlays a trailing 20-step mean (using available consecutive records during warm-up); resuming restores curves and the smoothing window. Long curves are sampled for display; all raw values are stored in training-history.jsonl.',
 '检查切分后，将按训练片段数换算总步数。':'After preparation, total steps are calculated from the number of training clips.',
 '高级设置':'Advanced settings','训练目标单位':'Training target unit','轮数':'Epochs','步数':'Steps','批次大小':'Batch size',
 '当前每一步训练一个片段，批次大小固定为 1。':'Each step trains on one clip. Batch size is currently fixed at 1.',
@@ -256,7 +257,7 @@ const names={idle:'准备就绪',starting:'准备材料',preparing:'检查与切
 $('status').textContent=state.stop_requested&&state.busy?'等待保存进度…':names[state.phase]||state.phase;
 const e=state.metrics||{},count=Number(state.config?.train_samples||e.train_samples)||0;
 if(e.step!==undefined){const target=state.config?.steps||100;$('step').textContent=uiLanguage==='en'?`${e.step} / ${target} steps`:`${e.step} / ${target} 步`;$('epoch').textContent=count?`${(e.step/count).toFixed(2)} / ${(target/count).toFixed(2)}`:'—';$('progress').max=target;$('progress').value=e.step}
-if(e.loss_average!==undefined)$('train-loss').textContent=Number(e.loss_average).toFixed(5);drawChart(state.history||[]);updateTarget();
+if(e.loss!==undefined)$('train-loss').textContent=Number(e.loss).toFixed(5);drawChart(state.history||[]);updateTarget();
 if(e.validation_loss!==undefined)$('loss').textContent=Number(e.validation_loss).toFixed(5);if(e.best_step!==undefined)$('best').textContent=e.best_step;
 $('logs').textContent=(state.logs||[]).join('\n');if(state.error||state.warning)showMessage('error',state.error||state.warning);$('artifacts').textContent=(state.artifacts||[]).join('\n');
 if(state.preparation){const p=state.preparation,english=uiLanguage==='en';
@@ -273,7 +274,7 @@ api('defaults').then(d=>{if(!form.elements.engine.value)form.elements.engine.val
 $('training-unit').onchange=()=>{const unit=$('training-unit').value,count=trainCount();if(count){if(unit==='steps')form.elements.steps.value=Math.ceil(Number(form.elements.epochs.value)*count);else form.elements.epochs.value=Number(form.elements.steps.value)/count}setUnit(unit)};form.addEventListener('input',updateTarget);
 $('lr-slider').oninput=()=>form.elements.lr.value=Number((10**Number($('lr-slider').value)).toPrecision(3));form.elements.lr.oninput=()=>$('lr-slider').value=Math.log10(Number(form.elements.lr.value));
 $('check-engine').onclick=async()=>{try{showMessage('engine-status','正在检查…');showMessage('engine-status',(await api('engine',{engine:form.elements.engine.value})).message)}catch(e){showMessage('engine-status',e.message)}};
-function drawChart(history){const svg=$('chart');svg.replaceChildren();const all=history.flatMap(p=>[p.loss_average,p.validation_loss]).filter(Number.isFinite);const node=(tag,attrs,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el};if(!all.length){node('text',{x:240,y:95,'text-anchor':'middle',fill:'#819087','font-size':13},'开始训练后显示误差曲线');return}const low=Math.min(...all),high=Math.max(...all),span=high-low||Math.max(high*.1,.01),maxStep=Math.max(1,...history.map(p=>p.step)),x=v=>48+v/maxStep*415,y=v=>155-(v-low)/span*125;for(let i=0;i<3;i++){const v=low+span*i/2;node('line',{x1:48,x2:463,y1:y(v),y2:y(v),stroke:'#e1e8df'});node('text',{x:42,y:y(v)+4,'text-anchor':'end',fill:'#819087','font-size':10},v.toFixed(3))}node('text',{x:48,y:179,fill:'#819087','font-size':10},'0');node('text',{x:463,y:179,'text-anchor':'end',fill:'#819087','font-size':10},maxStep+(uiLanguage==='en'?' steps':' 步'));for(const[key,color]of [['loss_average','#3c8365'],['validation_loss','#b97e3e']]){const points=history.filter(p=>Number.isFinite(p[key]));node('polyline',{points:points.map(p=>x(p.step)+','+y(p[key])).join(' '),fill:'none',stroke:color,'stroke-width':2});for(const p of points)node('circle',{cx:x(p.step),cy:y(p[key]),r:2,fill:color})}}
+function drawChart(history){const svg=$('chart');svg.replaceChildren();const all=history.flatMap(p=>[p.loss,p.loss_average,p.validation_loss]).filter(Number.isFinite);const node=(tag,attrs,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el};if(!all.length){node('text',{x:240,y:95,'text-anchor':'middle',fill:'#819087','font-size':13},'开始训练后显示误差曲线');return}const low=Math.min(...all),high=Math.max(...all),span=high-low||Math.max(high*.1,.01),maxStep=Math.max(1,...history.map(p=>p.step)),x=v=>48+v/maxStep*415,y=v=>155-(v-low)/span*125;for(let i=0;i<3;i++){const v=low+span*i/2;node('line',{x1:48,x2:463,y1:y(v),y2:y(v),stroke:'#e1e8df'});node('text',{x:42,y:y(v)+4,'text-anchor':'end',fill:'#819087','font-size':10},v.toFixed(3))}node('text',{x:48,y:179,fill:'#819087','font-size':10},'0');node('text',{x:463,y:179,'text-anchor':'end',fill:'#819087','font-size':10},maxStep+(uiLanguage==='en'?' steps':' 步'));for(const[key,color]of [['loss','#8baa9b'],['loss_average','#3c8365'],['validation_loss','#b97e3e']]){const points=history.filter(p=>Number.isFinite(p[key]));node('polyline',{points:points.map(p=>x(p.step)+','+y(p[key])).join(' '),fill:'none',stroke:color,'stroke-width':key==='loss'?1:2});for(const p of points)node('circle',{cx:x(p.step),cy:y(p[key]),r:key==='loss'?1:2,fill:color})}}
 addHelp(form);setUnit('epochs');localize();$('ui-language').value=uiLanguage;$('ui-language').onchange=()=>{uiLanguage=$('ui-language').value;localStorage.setItem('opensv-language',uiLanguage);localize();numberPairs();for(const id of ['error','engine-status','device-status'])if($(id).dataset.message)showMessage(id,$(id).dataset.message);if(lastState)paint(lastState);else updateTarget()};
 async function poll(){try{const state=await api('state');if(disconnected){disconnected=false;showMessage('error','')}paint(state)}catch(e){disconnected=true;$('error').textContent=(uiLanguage==='en'?'Service disconnected: ':'服务未连接：')+e.message}setTimeout(poll,1000)}poll();
 </script>
