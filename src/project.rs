@@ -201,10 +201,11 @@ fn directory_dictionary(path: &Path, language: &str) -> Result<HashMap<String, V
             };
             for line in text.lines() {
                 let words: Vec<_> = line.split_whitespace().collect();
-                if words.len() == 2 && !words[0].starts_with('#') {
-                    if let Some(phones) = entries.get(words[1]).cloned() {
-                        aliases.push((words[0].to_string(), phones));
-                    }
+                if words.len() == 2
+                    && !words[0].starts_with('#')
+                    && let Some(phones) = entries.get(words[1]).cloned()
+                {
+                    aliases.push((words[0].to_string(), phones));
                 }
             }
         }
