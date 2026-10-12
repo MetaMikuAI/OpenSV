@@ -76,8 +76,10 @@ class BundleTests(unittest.TestCase):
                     else:
                         self.assertFalse(any(n.startswith("training/") for n in contents))
                         self.assertFalse(any(n.startswith("start") for n in contents))
-                    checksum = archive.with_name(archive.name + ".sha256").read_text().split()[0]
-                    self.assertEqual(checksum, hashlib.sha256(archive.read_bytes()).hexdigest())
+                    # Text reads normalize CRLF and would hide Windows-only defects.
+                    checksum_bytes = archive.with_name(archive.name + ".sha256").read_bytes()
+                    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+                    self.assertEqual(checksum_bytes, f"{digest}  {archive.name}\n".encode("utf-8"))
                 self.assertEqual(hashes[0], hashes[1])
                 self.assertEqual(len(list((base / "dist").iterdir())), 4)
 

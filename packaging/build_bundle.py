@@ -92,7 +92,11 @@ def build(engine, target, output, revision, kind="training"):
             with tarfile.open(archive, "w:gz") as bundle:
                 bundle.add(root, arcname=root.name, filter=archive_permissions)
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
-    archive.with_name(archive.name + ".sha256").write_text(f"{checksum}  {archive.name}\n", encoding="utf-8")
+    # Write bytes so Windows cannot translate LF to CRLF; sha256sum on Linux
+    # would otherwise interpret the carriage return as part of the filename.
+    archive.with_name(archive.name + ".sha256").write_bytes(
+        f"{checksum}  {archive.name}\n".encode("utf-8")
+    )
     return archive
 
 
