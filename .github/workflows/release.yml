@@ -1,0 +1,63 @@
+name: Download bundles
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: download-bundles-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate release version
+        env:
+          RELEASE_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_REF_NAME: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import os, pathlib, tomllib
+          version = tomllib.loads(pathlib.Path('Cargo.toml').read_text())['package']['version']
+          python_version = tomllib.loads(pathlib.Path("training/pyproject.toml").read_text())["project"]["version"]
+          assert version == python_version, "Rust and Python package versions must match"
+          if os.environ['RELEASE_REF_TYPE'] == 'tag':
+              assert os.environ['RELEASE_REF_NAME'] == 'v' + version, 'Tag must match Cargo.toml version'
+          print('Bundle version:', version)
+          PY
+  bundle:
+    needs: validate
+    uses: ./.github/workflows/engine.yml
+    with:
+      bundle: true
+  release:
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: bundle
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bundle-*
+          path: dist
+          merge-multiple: true
+      - name: Verify all assets
+        run: |
+          cd dist
+          test "$(find . -name '*.sha256' | wc -l)" -eq 6
+          sha256sum --check *.sha256
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" dist/* --verify-tag --draft --title "OpenSV $RELEASE_TAG" --generate-notes

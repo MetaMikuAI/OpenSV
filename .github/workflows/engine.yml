@@ -1,0 +1,91 @@
+name: Engine checks and bundles
+on:
+  workflow_call:
+    inputs:
+      bundle:
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  engine:
+    name: Engine (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            executable: opensv
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            executable: opensv.exe
+          - os: macos-14
+            target: aarch64-apple-darwin
+            executable: opensv
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --target '${{ matrix.target }}'
+          rustup override set 1.97.1
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Lint
+        run: cargo clippy --locked --all-targets --target '${{ matrix.target }}' -- -D warnings
+      - name: Test
+        run: |
+          cargo test --locked --all-targets --target '${{ matrix.target }}'
+          cargo test --locked --doc --target '${{ matrix.target }}'
+      - name: Build release engine
+        run: cargo build --release --locked --target '${{ matrix.target }}'
+      - name: Engine smoke test
+        run: |
+          'target/${{ matrix.target }}/release/${{ matrix.executable }}' --version
+          'target/${{ matrix.target }}/release/${{ matrix.executable }}' --help
+          'target/${{ matrix.target }}/release/${{ matrix.executable }}' train --help
+      - uses: actions/setup-python@v5
+        if: inputs.bundle
+        with:
+          python-version: '3.13'
+      - uses: astral-sh/setup-uv@v6
+        if: inputs.bundle
+        with:
+          version: '0.12.2'
+      - name: Test packaging layout
+        if: inputs.bundle
+        run: python -m unittest discover -s packaging -p "test_*.py" -v
+      - name: Package engine and training bundles
+        if: inputs.bundle
+        run: python packaging/build_bundle.py --engine 'target/${{ matrix.target }}/release/${{ matrix.executable }}' --target '${{ matrix.target }}' --output local/dist
+      - name: Test the extracted deliverable
+        if: inputs.bundle
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          import subprocess
+          archives = list(Path('local/dist').glob('*.zip')) + list(Path('local/dist').glob('*.tar.gz'))
+          assert len(archives) == 2, archives
+          destination = Path('local/bundle smoke')
+          for archive in archives:
+              shutil.unpack_archive(str(archive), str(destination))
+          roots = list(destination.iterdir())
+          assert len(roots) == 2
+          for root in sorted(roots):
+              subprocess.run(['python', 'packaging/smoke_bundle.py', str(root)], check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: inputs.bundle
+        with:
+          name: bundle-${{ matrix.target }}
+          path: local/dist/*
+          if-no-files-found: error
+          retention-days: 14

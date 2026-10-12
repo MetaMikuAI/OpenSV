@@ -94,3 +94,11 @@ Benchmark on your dataset: this hybrid path is not guaranteed to outperform CPU.
 History compatibility: older versions did not persist curves. Resuming in the same GUI service migrates any retained in-memory history for that work directory. If the old service has exited and no `training-history.jsonl` exists, past per-step losses cannot be recovered; recording starts with subsequent training.
 
 Failed-job recovery: reuse the same work directory. Retry **Check and split** after preparation failure; use **Start training** if no `run/latest.pt` exists, or **Resume training** if a checkpoint exists. Retries preserve the old configuration and partial training output (plus the old dataset when preparing again) under `retry-backups/`. Unrelated directories, symlink outputs and jobs with `run.lock` are not automatically reused. Confirm the original process has exited before handling a stale lock.
+
+## Download bundles and CI/CD
+
+Rust CI checks formatting, Clippy, tests and builds on Windows x64, Linux x64 and macOS ARM64. Download bundles include the matching engine and Python source. Launch with uv using `start.cmd` (Windows), `start.command` (macOS) or `start.sh` (Linux); no Rust compilation or manual engine selection is required. First launch still downloads Python and training dependencies.
+
+Maintainers can manually run **Download bundles** for candidate artifacts. Matching `v*` tags create a draft Release only after all checks and extracted-bundle smoke tests pass. See `packaging/CI.md` for release instructions and limitations.
+
+CD provides Engine and Training downloads for each platform: six archives with individual checksums. Training includes the matching engine; do not download both. Choose Engine only for standalone CLI rendering/export.
