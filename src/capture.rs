@@ -3,7 +3,7 @@ use opensv::{
     phones::language_index,
     project,
     tensor::Tensor,
-    voice::{Voice, read_nofs},
+    voice::{Voice, read_container},
 };
 use serde_json::json;
 use std::{
@@ -53,7 +53,7 @@ pub fn run(request: &Request<'_>) -> Result<()> {
     let model = if request.voice.is_dir() {
         fs::read(request.voice.join("base_model.dnni"))?
     } else {
-        read_nofs(&fs::read(request.voice)?)?
+        read_container(request.voice)?
             .remove(b"acoustic".as_slice())
             .ok_or_else(|| anyhow::anyhow!("missing acoustic model"))?
     };
@@ -68,7 +68,7 @@ pub fn run(request: &Request<'_>) -> Result<()> {
         let model = if request.voice.is_dir() {
             fs::read(request.voice.join("pitch_model.dnni"))?
         } else {
-            read_nofs(&fs::read(request.voice)?)?
+            read_container(request.voice)?
                 .remove(b"vocoder".as_slice())
                 .ok_or_else(|| anyhow::anyhow!("missing vocoder"))?
         };

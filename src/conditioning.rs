@@ -4,7 +4,7 @@ use opensv::{
     phones::language_index,
     project,
     random::Gaussian,
-    voice::{Voice, read_nofs},
+    voice::{Voice, read_container},
 };
 use serde_json::json;
 use std::{
@@ -64,7 +64,7 @@ pub fn run(args: Args) -> Result<()> {
     }
     fs::create_dir_all(&args.output)?;
     let container = if args.voice.is_file() {
-        Some(read_nofs(&fs::read(&args.voice)?)?)
+        Some(read_container(&args.voice)?)
     } else {
         None
     };

@@ -33,15 +33,15 @@ WAV 应是该工程从零点导出的单人干声，保留前导静音，不带�
 ### 命令行
 
 ```powershell
-uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base-voice --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
+uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base.svpk --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
 uv run --project training --locked opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100 --seconds 1800
-opensv voice-export --voice base-voice --model runs/demo/trained-base.dnni --output trained.nofs
+opensv voice-export --voice base.svpk --model runs/demo/trained-base.dnni --output trained.nofs
 opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
 ```
 
 上述 WAV 声学训练使用 CUDA 时，在 `uv run` 参数中添加 `--no-group cpu --extra cuda`，在 `opensv train` 参数中添加 `--device cuda`。CLI 使用累计 `--steps`。
 
-`--voice` 接受已解码 NOFS 或模型目录，目录需要 `base_model.dnni`、`timing_model.dnni`、`pitch_model.dnni`。VSQX 按歌词查底模词典，不复用 VOCALOID 音素编码。SVP 已填写底模支持的显式音素时可省略词典。`--offset` 单位为秒，默认 0。
+`--voice` 接受 `.svpk`、`voice.nofs` 或已解码模型目录；支持 `dds`／`gen2a`／`nhv` 组合。目录需要 `base_model.dnni`、`timing_model.dnni`、`pitch_model.dnni`。VSQX 按歌词查底模词典，不复用 VOCALOID 音素编码。SVP 已填写底模支持的显式音素时可省略词典。`--offset` 单位为秒，默认 0。
 
 `--dictionary` 或界面的“发音词典”接受 `clf-data` 目录或自定义 JSON：
 

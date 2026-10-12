@@ -29,7 +29,7 @@ uv run --project training --locked --no-group cpu --extra cuda opensv-gui
 
 界面在本机浏览器中运行，可切换中文与英文。界面语言与材料语言分别设置。
 
-1. 填写底模声库和编译好的 `opensv` 引擎，点击“检查引擎”。底模接受已解码 NOFS 文件，或包含 `base_model.dnni`、`timing_model.dnni`、`pitch_model.dnni` 的模型目录。
+1. 填写底模声库和编译好的 `opensv` 引擎，点击“检查引擎”。底模接受 `.svpk` 声库包、`voice.nofs` 或已解码模型目录。支持 `dds` 声学、`gen2a` 时长和 `nhv` 声码器组合；旧版网络和加密 SVDB 不支持。
 2. 添加一组或多组干声 WAV 与对应的 SVP／VSQX，填写新工作目录。所有材料应属于同一目标声音，无需手写数据集清单。
 3. 选择材料语言（普通话／日语），按需填写底模的发音词典。点击“检查并切分”，查看提示并试听片段。
 4. 确认材料对应后设置累计训练轮数并开始训练，也可在高级设置中切换为累计步数。每轮按训练片段数换算为步数，批次大小固定为 1；页面显示轮数及换算后的总步数。
@@ -57,9 +57,9 @@ WAV 应从工程零点导出并保留前导静音，不带伴奏、混响或叠�
 以下 `opensv` 指编译后的引擎，Windows 下为 `target/release/opensv.exe`；可替换为实际程序路径或加入 PATH。
 
 ```powershell
-uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base-voice --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
+uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base.svpk --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
 uv run --project training --locked opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100
-opensv voice-export --voice base-voice --model runs/demo/trained-base.dnni --output trained.nofs
+opensv voice-export --voice base.svpk --model runs/demo/trained-base.dnni --output trained.nofs
 opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
 ```
 

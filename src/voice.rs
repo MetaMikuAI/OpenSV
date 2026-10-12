@@ -1,3 +1,7 @@
+mod container;
+
+pub use container::read as read_container;
+
 use crate::{
     acoustic::AcousticModel,
     model::{Model, u32_at},
@@ -64,7 +68,15 @@ pub fn export(template: &Path, model: &Path, output: &Path) -> Result<()> {
         entries.insert(vec![0x91], config);
         entries
     } else {
-        read_nofs(&fs::read(template)?)?.into_iter().collect()
+        let mut entries = read_container(template)?;
+        if entries.contains_key(b"\x91".as_slice()) {
+            for (alias, key) in container::references(&entries)? {
+                if alias == "acoustic" {
+                    entries.insert(key, acoustic.clone());
+                }
+            }
+        }
+        entries.into_iter().collect()
     };
     entries.insert(b"acoustic".to_vec(), acoustic);
     Timing::load(&Model::parse(
@@ -117,7 +129,7 @@ impl Voice {
             ["base_model.dnni", "timing_model.dnni", "pitch_model.dnni"]
                 .map(|name| fs::read(path.join(name)).with_context(|| format!("read {name}")))
         } else {
-            let entries = read_nofs(&fs::read(path)?)?;
+            let entries = read_container(path)?;
             [b"acoustic".as_slice(), b"duration", b"vocoder"].map(|name| {
                 entries.get(name).cloned().with_context(|| {
                     format!(

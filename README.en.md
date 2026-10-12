@@ -29,7 +29,7 @@ uv run --project training --locked --no-group cpu --extra cuda opensv-gui
 
 The interface runs in your local browser and supports Chinese and English. Interface language and material language are separate settings.
 
-1. Enter a base voice and the compiled `opensv` engine, then click **Check engine**. The base voice must be a decoded NOFS file or a model directory containing `base_model.dnni`, `timing_model.dnni`, and `pitch_model.dnni`.
+1. Enter a base voice and the compiled `opensv` engine, then click **Check engine**. The base voice accepts `.svpk`, `voice.nofs`, or a decoded model directory. Supported architectures are `dds` acoustic, `gen2a` duration, and `nhv` vocoder; legacy networks and encrypted SVDB are unsupported.
 2. Add one or more pairs of dry WAV audio and matching SVP/VSQX projects, then choose a new work directory. All recordings should use the same target voice. No handwritten dataset manifest is needed.
 3. Select the material language (Mandarin or Japanese) and provide the base voice's pronunciation dictionary when needed. Click **Check and split**, review the messages, and listen to the segments.
 4. Confirm that the materials match, set the total target epochs, and start training. Advanced settings let you switch to total steps. Each epoch is converted to steps using the number of training clips, with batch size fixed at 1; the interface shows epochs and the resulting total steps.
@@ -57,9 +57,9 @@ The interface accepts a separate **Preview dictionary**; leave it blank to use t
 Below, `opensv` refers to the compiled engine, located at `target/release/opensv.exe` on Windows. Replace it with the program's path or add it to PATH.
 
 ```powershell
-uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base-voice --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
+uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base.svpk --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
 uv run --project training --locked opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100
-opensv voice-export --voice base-voice --model runs/demo/trained-base.dnni --output trained.nofs
+opensv voice-export --voice base.svpk --model runs/demo/trained-base.dnni --output trained.nofs
 opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
 ```
 
