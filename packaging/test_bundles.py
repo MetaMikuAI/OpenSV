@@ -14,6 +14,21 @@ import build_bundle
 
 class BundleTests(unittest.TestCase):
     def test_all_platforms_have_distinct_engine_and_complete_training_packages(self):
+        self._assert_all_platform_bundles()
+
+    def test_archive_permissions_do_not_depend_on_host(self):
+        original = tarfile.TarFile.gettarinfo
+
+        def without_posix_permissions(bundle, *args, **kwargs):
+            member = original(bundle, *args, **kwargs)
+            if member is not None:
+                member.mode = 0o777 if member.isdir() else 0o666
+            return member
+
+        with patch.object(tarfile.TarFile, "gettarinfo", without_posix_permissions):
+            self._assert_all_platform_bundles()
+
+    def _assert_all_platform_bundles(self):
         version = tomllib.loads((build_bundle.REPO / "Cargo.toml").read_text())["package"]["version"]
         for target in build_bundle.TARGETS:
             with self.subTest(target=target), tempfile.TemporaryDirectory() as directory:
@@ -33,7 +48,17 @@ class BundleTests(unittest.TestCase):
                             contents = {n.name.split("/", 1)[1]: bundle.extractfile(n).read()
                                         for n in bundle.getmembers() if n.isfile()}
                             executable = next(n for n in bundle.getmembers() if n.name.endswith("/opensv"))
-                            self.assertTrue(executable.mode & 0o111)
+                            self.assertEqual(executable.mode, 0o755)
+                            members = {n.name.split("/", 1)[1]: n for n in bundle.getmembers()
+                                       if "/" in n.name}
+                            for member in bundle.getmembers():
+                                if member.isdir():
+                                    self.assertEqual(member.mode, 0o755)
+                            self.assertEqual(members["README.md"].mode, 0o644)
+                            if kind == "training":
+                                self.assertEqual(members["start.sh"].mode, 0o755)
+                                if target.endswith("apple-darwin"):
+                                    self.assertEqual(members["start.command"].mode, 0o755)
                     metadata = json.loads(contents["BUILD.json"])
                     self.assertEqual(metadata["kind"], kind)
                     self.assertEqual(metadata["target"], target)

@@ -39,6 +39,7 @@ def build(engine, target, output, revision, kind="training"):
     with tempfile.TemporaryDirectory(prefix="opensv-bundle-") as temporary:
         root = Path(temporary) / name
         root.mkdir()
+        executable_paths = {f"{root.name}/{executable}"}
         shutil.copy2(engine, root / executable)
         (root / executable).chmod(0o755)
         for name in ("LICENSE", "README.en.md"):
@@ -49,6 +50,7 @@ def build(engine, target, output, revision, kind="training"):
             if target.endswith("apple-darwin"):
                 launchers += ("start.command",)
             for launcher in launchers:
+                executable_paths.add(f"{root.name}/{launcher}")
                 shutil.copy2(REPO / "packaging" / launcher, root / launcher)
                 (root / launcher).chmod(0o755)
             training = root / "training"
@@ -78,8 +80,17 @@ def build(engine, target, output, revision, kind="training"):
                     if item.is_file():
                         bundle.write(item, item.relative_to(root.parent))
         else:
+            def archive_permissions(member):
+                # Encode target permissions explicitly: Windows chmod/stat cannot
+                # supply POSIX executable bits for Unix archive members.
+                if member.isdir() or member.name in executable_paths:
+                    member.mode = 0o755
+                elif member.isfile():
+                    member.mode = 0o644
+                return member
+
             with tarfile.open(archive, "w:gz") as bundle:
-                bundle.add(root, arcname=root.name)
+                bundle.add(root, arcname=root.name, filter=archive_permissions)
     checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
     archive.with_name(archive.name + ".sha256").write_text(f"{checksum}  {archive.name}\n", encoding="utf-8")
     return archive
