@@ -79,6 +79,8 @@ opensv voice-pack --voice trained.nofs --template path/to/voice.104.nofs --model
 
 ZIP 包含 `databases/` 和 `models/`，解压到 Flat 数据目录后重启宿主。当前只接受已验证的运行库版本，未知版本会报错；不提供官方 SVPK 安装包兼容保证。导出后需在目标宿主试听验证。
 
+WAV 训练切片仅保留工程中有音符的连续区域，空白两侧不拼接，短于 0.1 秒的片段跳过。删除识别错误的音符可排除对应音频；请保持原时间轴并检查切片字头、尾音。已有数据集需重新切分才应用此规则。
+
 ## 目录
 
 - `src/`：Rust CLI、模型读取与推理。

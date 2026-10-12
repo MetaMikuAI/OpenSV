@@ -16,6 +16,7 @@ import torch
 from .format import Model
 from .runtime import digest, emit
 from .score import load_score
+from .segments import annotated_segments
 from .vocoder import Normalizer
 
 
@@ -65,7 +66,7 @@ def alignment(audio, rate, intervals, offset):
         warnings.append(f"仅 {coverage:.0%} 的有声区位于预计音符附近，可能存在整体错位、伴奏或多余片段。")
     if recall < .55:
         warnings.append(f"预计音符区只有 {recall:.0%} 检测到声音，请检查缺失片段或时间错位。")
-    if coverage < .3 or recall < .2:
+    if recall < .2:
         errors.append("音符与有声区明显不匹配，修正后再导入。")
     return warnings, errors, dict(audio_coverage=coverage, note_coverage=recall)
 
@@ -88,6 +89,7 @@ def prepare(args):
     rate, audio, warnings = read_audio(args.audio)
     checks, errors, metrics = alignment(audio, rate, intervals, args.offset)
     warnings += checks
+    warnings.append("无音符区域不参与训练；切片按音符边界截取，请检查字头与尾音是否完整。")
     warnings.append("音素边界由底模根据歌词与音符估计，尚未进行逐音素强制对齐；请试听切片。")
     root = Path(args.output)
     root.mkdir(parents=True, exist_ok=False)
@@ -118,9 +120,14 @@ def prepare(args):
                                 if n.type in ("_ftmfv2", "_ftmfv3")).children[4])
     hop = round(target_rate * .005)
     samples, signatures = [], set()
-    for index, condition in enumerate(conditions["phrases"]):
+    segments = annotated_segments(conditions["phrases"], intervals)
+    report["segmentation"] = "annotated_regions_v1"
+    for index, condition in enumerate(segments):
         counts = np.asarray(condition["counts"], np.int64)
         frames = int(counts.sum())
+        if frames < 20:
+            warnings.append(f"片段 {index + 1} 短于 0.1 秒，已跳过。")
+            continue
         start = condition["start"] + args.offset
         waveform = crop(audio, round(start * target_rate), frames * hop)
         if np.sqrt(np.mean(waveform ** 2)) < 1e-4:

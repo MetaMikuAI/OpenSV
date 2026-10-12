@@ -89,6 +89,8 @@ The input must include acoustic, duration, vocoder and F0 models. Use a matching
 
 Extract the ZIP's `databases/` and `models/` into the Flat data directory and restart the host. Only the verified runtime build is accepted. This does not guarantee official SVPK installer compatibility; validate playback in the target host.
 
+WAV training clips retain contiguous annotated note regions without joining across gaps. Clips shorter than 0.1 seconds are skipped. Removing incorrect notes excludes the corresponding audio; preserve the original timeline and review consonant attacks and endings. Regenerate existing datasets to apply this rule.
+
 ## License
 
 [GPL-3.0](LICENSE)
