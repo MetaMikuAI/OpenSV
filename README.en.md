@@ -92,3 +92,5 @@ The acoustic network runs on MPS. For WAV supervision, the fixed vocoder and spe
 Benchmark on your dataset: this hybrid path is not guaranteed to outperform CPU. Unavailable MPS and out-of-memory failures produce explicit errors, not silent device switches. `PYTORCH_ENABLE_MPS_FALLBACK` is not required; do not disable MPS memory safety limits.
 
 History compatibility: older versions did not persist curves. Resuming in the same GUI service migrates any retained in-memory history for that work directory. If the old service has exited and no `training-history.jsonl` exists, past per-step losses cannot be recovered; recording starts with subsequent training.
+
+Failed-job recovery: reuse the same work directory. Retry **Check and split** after preparation failure; use **Start training** if no `run/latest.pt` exists, or **Resume training** if a checkpoint exists. Retries preserve the old configuration and partial training output (plus the old dataset when preparing again) under `retry-backups/`. Unrelated directories, symlink outputs and jobs with `run.lock` are not automatically reused. Confirm the original process has exited before handling a stale lock.

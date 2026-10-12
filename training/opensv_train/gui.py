@@ -10,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import webbrowser
 from urllib.parse import parse_qs, urlsplit
@@ -115,6 +116,15 @@ def device_options():
                 mps_available=mps_available, mps_reason=mps_reason)
 
 
+def save_config(root, config):
+    temporary = root / ("gui-" + uuid.uuid4().hex + ".tmp")
+    try:
+        temporary.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary.replace(root / "gui.json")
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 class Jobs:
     def __init__(self):
         self.lock = threading.RLock()
@@ -203,8 +213,16 @@ class Jobs:
                 saved.update({key: config[key] for key in ("engine", "preview", "preview_language", "preview_dictionary") if key in values})
                 config = configuration(saved)
                 if not (root / "run/latest.pt").is_file():
-                    raise ValueError("工作目录中没有可续训的 latest.pt")
-            elif not prepare and config["mode"] == "pair":
+                    raise ValueError("工作目录中没有可续训的 latest.pt；切分失败请重新「检查并切分」，训练启动失败请点击「开始训练」重试")
+            if not resume and root.exists():
+                for name in ("gui.json", "dataset", "run", "training-history.jsonl", "retry-backups"):
+                    if (root / name).is_symlink():
+                        raise ValueError("工作目录包含符号链接，不能安全重试；请使用新目录")
+                if (root / "run/latest.pt").exists():
+                    raise ValueError("该目录已有训练检查点，请使用「从工作目录续训」；重新切分请使用新目录")
+                if (root / "run/run.lock").exists():
+                    raise ValueError("检测到 run.lock，可能仍有训练进程；确认进程退出后再处理锁文件")
+            if not resume and not prepare and config["mode"] == "pair":
                 if not all((root / name).is_file() for name in ("gui.json", "dataset/preparation.json")):
                     raise ValueError("请先点击「检查并切分」，完成后确认对齐，再开始训练")
                 saved = json.loads((root / "gui.json").read_text(encoding="utf-8"))
@@ -212,7 +230,7 @@ class Jobs:
                 if (any(Path(config[key]).resolve() != Path(saved[key]).resolve()
                         for key in ("voice", "dictionary"))
                         or any(config[key] != saved[key] for key in ("pairs", "language"))):
-                    raise ValueError("材料已修改，请使用新工作目录重新检查切分")
+                    raise ValueError("材料已修改，请先重新「检查并切分」，再确认对齐后开始训练")
                 report = json.loads((root / "dataset/preparation.json").read_text(encoding="utf-8"))
                 if report["errors"]:
                     raise ValueError("材料检查未通过，请修正后重新导入")
@@ -221,8 +239,7 @@ class Jobs:
                 saved.update({key: config[key] for key in ("steps", "epochs", "seconds", "threads", "lr", "device")})
                 saved.update({key: config[key] for key in ("engine", "preview", "preview_language", "preview_dictionary") if key in values})
                 config = configuration(saved)
-                if (root / "run").exists():
-                    raise ValueError("该目录已有训练记录，请使用续训")
+
             if config["device"] in ("cuda", "mps"):
                 devices = device_options()
                 device = config["device"]
@@ -246,8 +263,17 @@ class Jobs:
                     raise ValueError(f"路径不存在：{key}")
                 config[key] = str(Path(config[key]).resolve())
             create_root = not resume and (prepare or config["mode"] == "dataset")
-            if create_root and root.exists():
-                raise ValueError("工作目录已存在，请选择新的工作目录；已有训练记录请使用续训")
+            retry = not resume and root.exists()
+            if retry:
+                try:
+                    saved_job = json.loads((root / "gui.json").read_text(encoding="utf-8"))
+                    owned = (isinstance(saved_job, dict) and saved_job.get("output")
+                             and Path(saved_job["output"]).expanduser().resolve() == root
+                             and saved_job.get("mode") in ("pair", "dataset"))
+                except (OSError, ValueError, TypeError):
+                    owned = False
+                if not owned:
+                    raise ValueError("工作目录已存在，请选择新的工作目录；仅可重试含有效 gui.json 的 OpenSV 工作目录")
             preparation = None
             if not prepare:
                 dataset = Path(config["dataset"]) if config["mode"] == "dataset" else root / "dataset/dataset.json"
@@ -255,13 +281,51 @@ class Jobs:
                 report_path = root / "dataset/preparation.json"
                 if config["mode"] == "pair" and report_path.is_file():
                     preparation = json.loads(report_path.read_text(encoding="utf-8"))
-            if create_root:
+            if create_root and not retry:
                 try:
                     root.mkdir(parents=True, exist_ok=False)
                 except FileExistsError:
                     raise ValueError("工作目录已存在，请选择新的工作目录；已有训练记录请使用续训") from None
+            backup = None
+            if retry:
+                # Preserve failed output instead of deleting it or mistaking it for a checkpoint.
+                names = ["gui.json", "run", "training-history.jsonl"]
+                if prepare:
+                    names.append("dataset")
+                inputs = [config[key] for key in ("voice", "engine", "dictionary", "preview", "preview_dictionary") if config[key]]
+                if config["mode"] == "dataset":
+                    inputs.append(config["dataset"])
+                    inputs.extend(str(Path(config["dataset"]).parent / name)
+                                  for name in ("base_model.dnni", "pitch_model.dnni"))
+                    manifest_path = Path(config["dataset"])
+                    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    inputs.extend(str(manifest_path.parent / sample[key]) for sample in manifest["samples"]
+                                  for key in ("features", "audio") if key in sample)
+                else:
+                    inputs.extend(pair[key] for pair in config["pairs"] for key in ("project", "audio"))
+                if any(Path(value).resolve().is_relative_to(root / name) for value in inputs for name in names):
+                    raise ValueError("输入材料位于待备份的任务输出内，请先将材料移到独立目录再重试")
+                backup = root / "retry-backups" / (time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8])
+                backup.mkdir(parents=True, exist_ok=False)
+                moved = []
+                try:
+                    for name in names:
+                        source = root / name
+                        if source.exists():
+                            source.rename(backup / name)
+                            moved.append(name)
+                except OSError:
+                    for name in reversed(moved):
+                        (backup / name).rename(root / name)
+                    raise
             config["output"] = str(root)
-            (root / "gui.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                save_config(root, config)
+            except OSError:
+                if backup:
+                    for name in reversed(moved):
+                        (backup / name).rename(root / name)
+                raise
             self.stop_file = root / "stop.request"
             self.stop_file.unlink(missing_ok=True)
             previous = self.state if resume and self.state.get("output") == str(root) else None
@@ -286,6 +350,8 @@ class Jobs:
                         event = dict(point, event="step" if "loss" in point else "checkpoint")
                         stream.write(json.dumps(event) + "\n")
             self.history_path = history_path
+            if backup:
+                self.log("已保留上次任务文件：" + str(backup))
             self.worker = threading.Thread(target=self.run, args=(config, resume, prepare), daemon=False)
             self.worker.start()
 
@@ -328,7 +394,7 @@ class Jobs:
                     return
                 manifest = json.loads(dataset.read_text(encoding="utf-8"))
                 config = training_target(config, manifest)
-                (root / "gui.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+                save_config(root, config)
                 self.update(config=config)
                 return
             args = [sys.executable, "-u", "-m", "opensv_train", "--model", str(dataset.parent / "base_model.dnni"),

@@ -66,6 +66,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}[hidden]{display:none!important
 <label id="confirmation"><input id="confirm" type="checkbox" style="display:inline;width:auto;margin-right:6px">我已查看切分与对齐提示，并确认材料对应。</label>
 <div class="actions"><button type="button" id="prepare">检查并切分</button><button class="primary" id="start">开始训练</button><button type="button" id="resume">从工作目录续训</button><button type="button" id="stop" disabled>保存并停止</button></div>
 <p class="footer">续训填写累计目标轮数或步数，沿用原材料与其他设置。</p>
+<p class="hint">失败后无需删除工作目录：切分失败请重新检查并切分；尚无检查点时点击开始训练重试；已有检查点请续训。重试前半成品会保留在 retry-backups。</p>
 </form>
 <aside><section class="card"><h2><b>03</b>进度与结果</h2><div class="status" id="status">准备就绪</div><progress id="progress" max="100" value="0"></progress>
 <div class="metrics"><div class="metric"><span>已完成轮数</span><strong id="epoch">—</strong><small id="step">—</small></div>
@@ -138,6 +139,7 @@ Object.assign(translations,{
 'PyTorch 加载失败，请检查训练环境':'Could not load PyTorch. Check the training environment.',
 '显存不足。请关闭占用显卡的程序、缩短音频片段，或选择 CPU。':'GPU memory is insufficient. Close other GPU applications, use shorter audio segments, or choose CPU.',
 'CUDA 不可用。请安装 CUDA 版 PyTorch 并检查 NVIDIA 驱动，或选择 CPU。':'CUDA is unavailable. Install a CUDA-enabled PyTorch build and check the NVIDIA driver, or choose CPU.',
+'失败后无需删除工作目录：切分失败请重新检查并切分；尚无检查点时点击开始训练重试；已有检查点请续训。重试前半成品会保留在 retry-backups。':'No need to delete a failed job: retry Check and split after preparation failure, Start training without a checkpoint, or Resume with a checkpoint. Previous partial outputs are preserved in retry-backups.',
 '训练设备必须为 cpu、cuda 或 mps':'Training device must be cpu, cuda or mps.',
 '训练轮数必须为大于 0 的有限数值':'Training epochs must be a finite number greater than 0.',
 '数据集中没有训练片段':'The dataset contains no training clips.',

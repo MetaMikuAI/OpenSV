@@ -442,6 +442,94 @@ class GuiTests(unittest.TestCase):
             self.assertEqual(jobs.snapshot()["config"]["engine"], str((dataset.parent / "base_model.dnni").resolve()))
             self.assertFalse((root / "run").exists())
 
+    def test_failed_preparation_can_retry_without_deleting_partial_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            source = base / "source"
+            source.touch()
+            root = base / "job"
+            config = dict(output=str(root), engine=str(source), voice=str(base),
+                          project=str(source), audio=str(source), mode="pair")
+            jobs = Jobs()
+            with patch("opensv_train.gui.threading.Thread"):
+                jobs.start(config, prepare=True)
+            (root / "dataset").mkdir()
+            (root / "dataset/partial").write_text("keep")
+            jobs.update(busy=False, phase="error")
+            with patch("opensv_train.gui.threading.Thread") as worker:
+                jobs.start(config, prepare=True)
+                worker.return_value.start.assert_called_once()
+            self.assertFalse((root / "dataset").exists())
+            backups = list((root / "retry-backups").iterdir())
+            self.assertEqual((backups[0] / "dataset/partial").read_text(), "keep")
+            self.assertTrue((backups[0] / "gui.json").is_file())
+
+    def test_start_retries_run_without_checkpoint_but_preserves_dataset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            dataset = self.write_dataset(root / "dataset")
+            (root / "dataset/preparation.json").write_text('{"errors":[]}')
+            engine = root / "engine"
+            engine.touch()
+            config = configuration(dict(output=str(root), engine=str(engine), voice=str(root),
+                                        project=str(engine), audio=str(engine), mode="pair"))
+            (root / "gui.json").write_text(json.dumps(config))
+            (root / "run").mkdir()
+            (root / "run/partial.tmp").write_text("partial")
+            with patch("opensv_train.gui.threading.Thread"):
+                Jobs().start(dict(config, confirm_alignment=True))
+            self.assertTrue(dataset.is_file())
+            self.assertFalse((root / "run").exists())
+            self.assertEqual(next((root / "retry-backups").glob("*/run/partial.tmp")).read_text(), "partial")
+
+    def test_retry_never_moves_checkpoint_or_locked_run(self):
+        for protected in ("latest.pt", "run.lock"):
+            with self.subTest(protected=protected), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "run").mkdir()
+                (root / "run" / protected).write_text("keep")
+                with patch("opensv_train.gui.threading.Thread") as worker:
+                    with self.assertRaisesRegex(ValueError, "检查点|run.lock"):
+                        Jobs().start(dict(output=directory, mode="pair"), prepare=True)
+                    worker.assert_not_called()
+                self.assertEqual((root / "run" / protected).read_text(), "keep")
+                self.assertFalse((root / "retry-backups").exists())
+
+    def test_existing_dataset_job_without_checkpoint_can_retry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            dataset = self.write_dataset(base / "data")
+            engine = base / "engine"
+            engine.touch()
+            root = base / "job"
+            root.mkdir()
+            config = configuration(dict(output=str(root), engine=str(engine), voice=str(base),
+                                        dataset=str(dataset), mode="dataset"))
+            (root / "gui.json").write_text(json.dumps(config))
+            (root / "run").mkdir()
+            with patch("opensv_train.gui.threading.Thread") as worker:
+                Jobs().start(config)
+                self.assertFalse(worker.call_args.kwargs["args"][1])
+            self.assertTrue(dataset.is_file())
+            self.assertFalse((root / "run").exists())
+            self.assertTrue(next((root / "retry-backups").glob("*/gui.json")).is_file())
+
+    def test_retry_rejects_input_inside_directory_to_be_archived(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "dataset").mkdir()
+            source = root / "dataset/source"
+            source.write_text("keep")
+            config = configuration(dict(output=str(root), engine=str(source), voice=str(root),
+                                        project=str(source), audio=str(source), mode="pair"))
+            (root / "gui.json").write_text(json.dumps(config))
+            with patch("opensv_train.gui.threading.Thread") as worker:
+                with self.assertRaisesRegex(ValueError, "输入材料位于"):
+                    Jobs().start(config, prepare=True)
+                worker.assert_not_called()
+            self.assertEqual(source.read_text(), "keep")
+            self.assertFalse((root / "retry-backups").exists())
+
     def test_missing_job_prevents_resume(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "new-job"
