@@ -34,6 +34,18 @@ pub struct TrainArgs {
     resume: bool,
     #[arg(long)]
     vocoder: Option<PathBuf>,
+    /// Audio loss: multiresolution_stft_v1 or mel_v1.
+    #[arg(long, default_value = "multiresolution_stft_v1", value_parser = ["multiresolution_stft_v1", "mel_v1"])]
+    loss: String,
+    /// Train only the speaker/style vectors for these first steps.
+    #[arg(long, default_value_t = 0)]
+    embed_steps: u32,
+    /// Learning rate of the vector-only steps.
+    #[arg(long, default_value_t = 0.003)]
+    embed_lr: f64,
+    /// Decay --lr to 5% over the steps after --embed-steps.
+    #[arg(long)]
+    cosine: bool,
 }
 
 pub fn run(args: TrainArgs) -> Result<()> {
@@ -79,6 +91,16 @@ pub fn run(args: TrainArgs) -> Result<()> {
     }
     if let Some(vocoder) = args.vocoder {
         command.arg("--vocoder").arg(vocoder);
+    }
+    command
+        .arg("--loss")
+        .arg(args.loss)
+        .arg("--embed-steps")
+        .arg(args.embed_steps.to_string())
+        .arg("--embed-lr")
+        .arg(args.embed_lr.to_string());
+    if args.cosine {
+        command.arg("--cosine");
     }
     let status = command.status().context(
         "cannot start Python; install the training package with python -m pip install -e training",

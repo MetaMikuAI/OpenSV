@@ -143,6 +143,37 @@ class TrainingDeviceTests(unittest.TestCase):
     def test_cpu_checkpoint_resume(self):
         self.check_resume(("cpu", "cpu"))
 
+    def test_vector_stage_moves_only_voice_vectors_then_everything(self):
+        class VectorCore(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.speaker = torch.nn.Parameter(torch.tensor(1.))
+                self.style = torch.nn.Parameter(torch.tensor(1.))
+                self.weight = torch.nn.Parameter(torch.tensor(1.))
+
+            def frame_context(self, phones, counts, languages, pitch):
+                return phones + pitch
+
+            def forward(self, inputs, noise):
+                return inputs * self.weight * self.speaker * self.style + noise
+
+            def export(self):
+                pass
+
+        sample = ((torch.ones(2, 1), [2], [0], torch.zeros(2, 1)), torch.zeros(2, 1), torch.zeros(2, 1))
+        groups = {"train": [sample], "validation": [sample]}
+        for steps, weight_moved in ((2, False), (4, True)):
+            with tempfile.TemporaryDirectory() as directory:
+                core = VectorCore()
+                args = SimpleNamespace(output=Path(directory), lr=.01, scope="acoustic", steps=steps, seconds=30, save_every=99,
+                                       embed_steps=2, embed_lr=.1, cosine=True)
+                with patch("opensv_train.__main__.Model.read"), patch("opensv_train.__main__.emit"):
+                    train(args, SimpleNamespace(to_bytes=lambda: b"model"), core, list(core.parameters()), groups, {}, None,
+                          time.monotonic(), random.Random(1))
+                state = torch.load(Path(directory) / "latest.pt", map_location="cpu", weights_only=True)
+                self.assertLess(state["vectors"][0].item(), 1 - .1)
+                self.assertEqual(state["vectors"][2].item() != 1, weight_moved)
+
     @unittest.skipUnless(torch.cuda.is_available(), "CUDA runtime unavailable")
     def test_checkpoint_moves_between_cpu_and_cuda(self):
         self.check_resume(("cpu", "cuda", "cpu"))

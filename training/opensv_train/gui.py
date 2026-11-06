@@ -384,7 +384,8 @@ class Jobs:
             if prepare:
                 self.command([sys.executable, "-u", "-m", "opensv_train.prepare", "--engine", engine,
                               "--voice", config["voice"], "--pairs", str(root / "gui.json"),
-                              "--output", str(dataset.parent), "--language", config["language"], *dictionary], "preparing")
+                              "--output", str(dataset.parent), "--language", config["language"], "--align",
+                              "--device", config["device"], *dictionary], "preparing")
                 report = json.loads((dataset.parent / "preparation.json").read_text(encoding="utf-8"))
                 selected = [s for s in report["segments"] if s.get("split")]
                 audio = str(dataset.parent / (selected[0]["id"] + ".wav")) if selected else None
@@ -416,7 +417,7 @@ class Jobs:
                 dictionary = ["--dictionary", preview_dictionary] if preview_dictionary else []
                 try:
                     self.command([engine, "render", "--voice", str(voice), "--project", config["preview"],
-                                  "--output", str(audio), "--pitch-mode", "notes",
+                                  "--output", str(audio), "--pitch-mode", "natural",
                                   "--language", config["preview_language"] or config["language"], *dictionary], "render")
                     self.update(audio=str(audio))
                 except (OSError, RuntimeError) as error:

@@ -97,11 +97,18 @@ def load_data(path, core, scope="embeddings", objective=None):
 def run(args):
     device = training_device(getattr(args, "device", "cpu"))
     if args.lr is None:
-        args.lr = 0.000001 if args.vocoder is not None else 0.00001 if args.scope == "acoustic" else 0.001
+        if args.scope == "embeddings":
+            args.lr = 0.003 if args.vocoder is not None else 0.001
+        else:
+            args.lr = 0.000001 if args.vocoder is not None else 0.00001
     if args.steps < 1 or args.seconds <= 0 or not math.isfinite(args.seconds):
         raise ValueError("Steps and seconds must be positive")
     if args.threads < 1 or args.save_every < 1 or not 0 < args.lr < 1:
         raise ValueError("Invalid threads, save interval or learning rate")
+    embed_steps = getattr(args, "embed_steps", 0)
+    if embed_steps and (args.scope != "acoustic" or args.vocoder is None or embed_steps < 0 or embed_steps >= args.steps
+                        or not 0 < args.embed_lr < 1):
+        raise ValueError("--embed-steps needs acoustic audio training, fewer steps than --steps and a valid --embed-lr")
     started = time.monotonic()
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)
@@ -117,9 +124,7 @@ def run(args):
     objective = None
     if args.vocoder is not None:
         from .audio import AudioObjective
-        if args.scope != "acoustic":
-            raise ValueError("Audio supervision requires acoustic scope")
-        objective = AudioObjective(model, args.vocoder)
+        objective = AudioObjective(model, args.vocoder, getattr(args, "loss", "multiresolution_stft_v1"))
     groups, signatures = load_data(args.dataset, core, args.scope, objective)
     core.to(device)
     if objective is not None:
@@ -134,7 +139,12 @@ def run(args):
                 "scope": args.scope, "lr": args.lr, "seed": args.seed,
                 "threads": args.threads, "backend_version": 2 if args.scope == "acoustic" else 1}
     if objective is not None:
-        contract.update(vocoder=objective.signature, loss="multiresolution_stft_v1")
+        contract.update(vocoder=objective.signature, loss=objective.loss)
+    # Absent unless used, so checkpoints from earlier versions still resume.
+    if embed_steps:
+        contract.update(embed_steps=embed_steps, embed_lr=args.embed_lr)
+    if getattr(args, "cosine", False):
+        contract.update(cosine=True)
     output = args.output
     state = None
     if args.resume:
@@ -164,6 +174,23 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
     optimizer = torch.optim.Adam(parameters, lr=args.lr)
     step, best_loss = 0, float("inf")
     cursor, order = 0, []
+    embed_steps = getattr(args, "embed_steps", 0)
+    cosine = getattr(args, "cosine", False)
+
+    def learning_rate(index):
+        if index < embed_steps:
+            return args.embed_lr
+        if not cosine:
+            return args.lr
+        progress = (index - embed_steps) / max(args.steps - embed_steps, 1)
+        return args.lr * (.05 + .95 * .5 * (1 + math.cos(math.pi * min(progress, 1))))
+
+    def set_stage(index):
+        """Fit the voice vectors first; the shared network only starts moving afterwards."""
+        for parameter in parameters:
+            parameter.requires_grad_(index >= embed_steps)
+        core.speaker.requires_grad_(True)
+        core.style.requires_grad_(True)
 
     def vectors(values):
         if len(values) != len(parameters):
@@ -225,6 +252,8 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
          train_samples=len(groups["train"]), validation_samples=len(groups["validation"]), step=step)
     if state is None:
         save()
+    if embed_steps:
+        set_stage(step)
     interrupted = False
     def interrupt(signum, frame):
         nonlocal interrupted
@@ -240,6 +269,10 @@ def train(args, model, core, parameters, groups, contract, state, started, rng, 
                 rng.shuffle(order)
                 cursor = 0
             item = groups["train"][order[cursor]]
+            if embed_steps and step == embed_steps:
+                set_stage(step)
+            for group in optimizer.param_groups:
+                group["lr"] = learning_rate(step)
             optimizer.zero_grad(set_to_none=True)
             loss = forward(item)
             if not bool(torch.isfinite(loss)):
@@ -297,6 +330,11 @@ def main():
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--stop-file", type=Path)
     parser.add_argument("--vocoder", type=Path)
+    parser.add_argument("--loss", choices=("multiresolution_stft_v1", "mel_v1"), default="multiresolution_stft_v1",
+                        help="Audio loss; mel_v1 follows hearing and caps at 16 kHz")
+    parser.add_argument("--embed-steps", type=int, default=0, help="Train only the speaker/style vectors for these first steps")
+    parser.add_argument("--embed-lr", type=float, default=.003, help="Learning rate of the vector-only steps")
+    parser.add_argument("--cosine", action="store_true", help="Decay --lr to 5%% over the steps after --embed-steps")
     args = parser.parse_args()
     try:
         return run(args)

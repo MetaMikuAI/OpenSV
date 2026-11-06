@@ -11,6 +11,7 @@ pub struct RenderRequest {
     pub language: String,
     pub dictionary: Option<PathBuf>,
     pub seed: u32,
+    pub pitch_mode: project::PitchMode,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -31,6 +32,7 @@ pub fn render(request: &RenderRequest) -> Result<RenderReport> {
         &request.language,
         request.dictionary.as_deref(),
         request.seed,
+        request.pitch_mode,
     )?;
     let spec = hound::WavSpec {
         channels: 1,

@@ -36,7 +36,7 @@ WAV 应是该工程从零点导出的单人干声，保留前导静音，不带�
 uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base.svpk --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
 uv run --project training --locked opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100 --seconds 1800
 opensv voice-export --voice base.svpk --model runs/demo/trained-base.dnni --output trained.nofs
-opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
+opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode natural
 ```
 
 上述 WAV 声学训练使用 CUDA 时，在 `uv run` 参数中添加 `--no-group cpu --extra cuda`，在 `opensv train` 参数中添加 `--device cuda`。CLI 使用累计 `--steps`。
@@ -54,6 +54,10 @@ opensv render --voice trained.nofs --project song.svp --output song.wav --langua
 界面可单独填写“试听词典”，留空沿用材料词典，不改变已准备的训练材料。
 
 训练将干声的多尺度频谱误差通过固定声码器反传到声学网络，不需要老师模型或中间特征。时长、F0、声码器权重及清浊音硬判定不训练。
+
+`opensv-prepare --align` 用底模渲染结果对音频做 DTW，修正底模估计的音素边界（界面默认开启，可用 `--device` 选择设备）。这一步只用底模、工程和音频，得到的是估计值，不等于人工标注。
+
+音频训练可选：`--scope embeddings` 只训练 speaker／style 向量（默认学习率 0.003）；`--embed-steps N` 先只训练向量 N 步，再训练全部参数；`--loss mel_v1` 使用按听觉分布、上限 16 kHz 的损失；`--cosine` 让学习率在训练后段衰减到 5%。
 
 导入自动转换双声道和采样率，输出 `dataset.json`、NPZ、单声道 WAV 与 `preparation.json`。CLI 请先查看检查报告；有错误时不生成清单并返回非零退出码。自由演唱录音仍需先对齐到工程时间。
 

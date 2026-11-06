@@ -60,14 +60,14 @@ WAV 应从工程零点导出并保留前导静音，不带伴奏、混响或叠�
 uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base.svpk --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
 uv run --project training --locked opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100
 opensv voice-export --voice base.svpk --model runs/demo/trained-base.dnni --output trained.nofs
-opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
+opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode natural
 ```
 
 上述 WAV 声学训练使用 CUDA 时，在 `uv run` 参数中添加 `--no-group cpu --extra cuda`，在 `opensv train` 参数中添加 `--device cuda`。
 
 材料导入支持 SVP、VSQX 3／4；直接渲染使用 SVP，支持普通话、日语及显式音素，输出单声道 WAV。详细参数、批量导入及数据格式见[训练说明](training/README.md)和 `opensv --help`。
 
-渲染使用音符音高，尚不支持自动 F0、参数曲线、引用组及加密声库；导出不保证兼容官方宿主。模型、声库、音频和发音词典需自行准备，引擎与分发 ZIP 不提交到 Git。
+渲染的 `--pitch-mode natural` 在音符音高上加入滑音、晚起的颤音和微小漂移，只依据工程计算；`notes` 为完全平直的音符音高，高音会有持续的高频啸叫。尚不支持自动 F0、参数曲线、引用组及加密声库；导出不保证兼容官方宿主。模型、声库、音频和发音词典需自行准备，引擎与分发 ZIP 不提交到 Git。
 
 ## Flat 声库装配（实验性）
 

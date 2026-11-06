@@ -379,6 +379,26 @@ fn prepare_notes(
     }
     Ok(output)
 }
+/// How the renderer turns notes into a pitch curve.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PitchMode {
+    /// One constant pitch per note. Flat pitch makes the upper harmonics whine.
+    Notes,
+    /// Notes plus glides, late vibrato and slow drift, computed from the score alone.
+    Natural,
+}
+
+impl std::str::FromStr for PitchMode {
+    type Err = anyhow::Error;
+    fn from_str(value: &str) -> Result<Self> {
+        match value {
+            "notes" => Ok(Self::Notes),
+            "natural" => Ok(Self::Natural),
+            other => anyhow::bail!("unknown pitch mode {other}"),
+        }
+    }
+}
+
 pub struct Phrase {
     pub phones: Vec<TimedPhoneme>,
     pub log_f0: Vec<f32>,
@@ -402,6 +422,26 @@ pub fn prepare_with_limit(
     language: &str,
     dict: Option<&Path>,
     phrase_seconds: f64,
+) -> Result<Vec<Phrase>> {
+    prepare_phrases(
+        path,
+        voice,
+        language,
+        dict,
+        phrase_seconds,
+        PitchMode::Notes,
+        0,
+    )
+}
+
+fn prepare_phrases(
+    path: &Path,
+    voice: &Voice,
+    language: &str,
+    dict: Option<&Path>,
+    phrase_seconds: f64,
+    pitch_mode: PitchMode,
+    seed: u32,
 ) -> Result<Vec<Phrase>> {
     let bytes = fs::read(path)?;
     let bytes = bytes.strip_suffix(&[0]).unwrap_or(&bytes);
@@ -488,6 +528,10 @@ pub fn prepare_with_limit(
                         as f32,
                 );
             }
+            if pitch_mode == PitchMode::Natural {
+                // Each phrase gets its own movement instead of repeating the same curve.
+                pitch = crate::pitch::naturalize(&pitch, seed.wrapping_add(output.len() as u32));
+            }
             let gain = 10f32.powf(track.mixer.gain_decibel / 20.0);
             output.push(Phrase {
                 phones,
@@ -502,15 +546,16 @@ pub fn prepare_with_limit(
     Ok(output)
 }
 
-/// 按音符音高渲染主音符组，输出单声道采样。
+/// 渲染主音符组，输出单声道采样。
 pub fn render(
     path: &Path,
     voice: &Voice,
     language: &str,
     dict: Option<&Path>,
     seed: u32,
+    pitch_mode: PitchMode,
 ) -> Result<Vec<f32>> {
-    let phrases = prepare(path, voice, language, dict)?;
+    let phrases = prepare_phrases(path, voice, language, dict, 30.0, pitch_mode, seed)?;
     let mut output = Vec::<f32>::new();
     let rate = voice.vocoder.sample_rate as f64;
     for phrase in phrases {

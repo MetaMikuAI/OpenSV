@@ -13,6 +13,7 @@ from scipy.io import wavfile
 from scipy.signal import resample_poly
 import torch
 
+from .audio import read_wav
 from .format import Model
 from .runtime import digest, emit
 from .score import load_score
@@ -90,7 +91,10 @@ def prepare(args):
     checks, errors, metrics = alignment(audio, rate, intervals, args.offset)
     warnings += checks
     warnings.append("无音符区域不参与训练；切片按音符边界截取，请检查字头与尾音是否完整。")
-    warnings.append("音素边界由底模根据歌词与音符估计，尚未进行逐音素强制对齐；请试听切片。")
+    if getattr(args, "align", False):
+        warnings.append("音素边界先由底模估计，再按音频做 DTW 对齐；这是估计值，不等于人工标注，请试听切片。")
+    else:
+        warnings.append("音素边界由底模根据歌词与音符估计，尚未进行逐音素强制对齐；请试听切片。")
     root = Path(args.output)
     root.mkdir(parents=True, exist_ok=False)
     report = dict(warnings=warnings, errors=errors, metrics=metrics, segments=[],
@@ -159,6 +163,17 @@ def prepare(args):
         samples.append(dict(id=name, features=f"{name}.npz", audio=f"{name}.wav"))
         report["segments"].append(dict(id=name, start=start, end=start + frames * .005))
         emit(event="segment", count=len(samples))
+    if getattr(args, "align", False) and samples:
+        from .align import Aligner
+        aligner = Aligner(root / "base_model.dnni", root / "pitch_model.dnni", getattr(args, "device", "cpu"))
+        for position, sample in enumerate(samples):
+            path = root / sample["features"]
+            with np.load(path, allow_pickle=False) as archive:
+                arrays = {key: archive[key].copy() for key in archive.files}
+            arrays["counts"], arrays["phones"], shift = aligner.align(arrays, read_wav(root / sample["audio"], target_rate))
+            np.savez(path, **arrays)
+            report["segments"][position]["boundary_shift_ms"] = shift
+            emit(event="aligned", count=position + 1, total=len(samples))
     split = max(1, len(samples) - max(1, round(len(samples) * .2)))
     if len(samples) > split:
         boundary = report["segments"][split]["start"]
@@ -247,6 +262,8 @@ def main():
     parser.add_argument("--dictionary", type=Path)
     parser.add_argument("--language", default="mandarin")
     parser.add_argument("--offset", type=float, default=0, help="WAV 时间减去工程时间，单位秒")
+    parser.add_argument("--align", action="store_true", help="按音频做 DTW，修正底模估计的音素边界")
+    parser.add_argument("--device", choices=("cpu", "cuda", "mps"), default="cpu", help="DTW 对齐渲染底模时使用的设备")
     args = parser.parse_args()
     try:
         if args.pairs:

@@ -8,7 +8,7 @@ import torch
 
 from .format import Model
 from .runtime import digest
-from .vocoder import Normalizer, Vocoder, decode, spectral_loss
+from .vocoder import Normalizer, Vocoder, decode, mel_spectral_loss, spectral_loss
 
 
 def read_wav(path, sample_rate):
@@ -49,9 +49,15 @@ def read_wav(path, sample_rate):
     return torch.from_numpy(result)
 
 
+LOSSES = ("multiresolution_stft_v1", "mel_v1")
+
+
 class AudioObjective(torch.nn.Module):
-    def __init__(self, model, path):
+    def __init__(self, model, path, loss=LOSSES[0]):
         super().__init__()
+        if loss not in LOSSES:
+            raise ValueError(f"Unknown audio loss {loss}")
+        self.loss = loss
         features = next(n for n in model.nodes if n.type in ("_ftmfv2", "_ftmfv3"))
         self.normalizer = Normalizer(features.children[5])
         self.vocoder = Vocoder(Model.read(path).root)
@@ -62,4 +68,6 @@ class AudioObjective(torch.nn.Module):
         audio = self.vocoder(decode(self.normalizer, prediction, log_f0))
         if audio.shape != waveform.shape:
             raise ValueError("WAV length does not match aligned frames")
+        if self.loss == "mel_v1":
+            return mel_spectral_loss(audio, waveform, self.vocoder.sample_rate)
         return spectral_loss(audio, waveform)

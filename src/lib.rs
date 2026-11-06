@@ -5,6 +5,7 @@ pub mod model;
 pub mod network;
 pub mod normalizer;
 pub mod phones;
+pub mod pitch;
 pub mod project;
 pub mod random;
 mod residual;

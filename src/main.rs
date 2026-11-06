@@ -53,7 +53,8 @@ enum Command {
         dictionary: Option<PathBuf>,
         #[arg(long, default_value_t = 5489)]
         seed: u32,
-        #[arg(long,required=true,value_parser=["notes"])]
+        /// `natural` adds glides, late vibrato and drift from the score alone; `notes` keeps flat note pitch.
+        #[arg(long,required=true,value_parser=["notes", "natural"])]
         pitch_mode: String,
     },
     Vocoder {
@@ -208,7 +209,7 @@ fn main() -> Result<()> {
             language,
             dictionary,
             seed,
-            pitch_mode: _,
+            pitch_mode,
         } => {
             let report = opensv::workflow::render(&opensv::workflow::RenderRequest {
                 voice,
@@ -217,6 +218,7 @@ fn main() -> Result<()> {
                 language,
                 dictionary,
                 seed,
+                pitch_mode: pitch_mode.parse()?,
             })?;
             println!(
                 "samples={} sample_rate={} elapsed_ms={}",

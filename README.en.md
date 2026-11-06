@@ -60,14 +60,14 @@ Below, `opensv` refers to the compiled engine, located at `target/release/opensv
 uv run --project training --locked opensv-prepare --engine target/release/opensv.exe --voice base.svpk --project song.vsqx --audio song.wav --output dataset --dictionary path/to/clf-data
 uv run --project training --locked opensv train --model dataset/base_model.dnni --vocoder dataset/pitch_model.dnni --dataset dataset/dataset.json --output runs/demo --steps 100
 opensv voice-export --voice base.svpk --model runs/demo/trained-base.dnni --output trained.nofs
-opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode notes
+opensv render --voice trained.nofs --project song.svp --output song.wav --language mandarin --dictionary path/to/clf-data --pitch-mode natural
 ```
 
 To use CUDA for the WAV acoustic training command above, add `--no-group cpu --extra cuda` to the `uv run` options and `--device cuda` to the `opensv train` options.
 
 Material import supports SVP and VSQX 3/4. Direct rendering accepts SVP, supports Mandarin, Japanese, and explicit phonemes, and outputs mono WAV. For parameters, batch import, and dataset formats, see the [training guide (Chinese)](training/README.md) and `opensv --help`.
 
-Rendering uses note pitch; automatic F0, parameter curves, referenced groups, and encrypted voicebanks are not supported. Exported voices are not guaranteed to work with official hosts. Provide your own models, voicebanks, audio, and pronunciation dictionaries. Compiled engines and distribution ZIPs are not tracked in Git.
+Rendering with `--pitch-mode natural` adds glides, late vibrato and slight drift to the note pitch, computed from the score alone; `notes` keeps a perfectly flat note pitch, which causes a constant high-frequency whine on high notes. Automatic F0, parameter curves, referenced groups, and encrypted voicebanks are not supported. Exported voices are not guaranteed to work with official hosts. Provide your own models, voicebanks, audio, and pronunciation dictionaries. Compiled engines and distribution ZIPs are not tracked in Git.
 
 ## Layout
 

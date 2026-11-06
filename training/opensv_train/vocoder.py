@@ -300,3 +300,41 @@ def spectral_loss(audio, target):
         losses.append((actual - expected).norm() / expected.norm().clamp_min(1e-5)
                       + (actual.log() - expected.log()).abs().mean())
     return torch.stack(losses).mean()
+
+
+@lru_cache(maxsize=8)
+def _mel_weights(rate, size, count, low, high):
+    mel = lambda hz: 2595 * np.log10(1 + hz / 700)
+    edges = 700 * (10 ** (np.linspace(mel(low), mel(high), count + 2) / 2595) - 1)
+    freqs = np.arange(size // 2 + 1) * rate / size
+    weights = np.zeros((count, len(freqs)), np.float32)
+    for i in range(count):
+        a, b, c = edges[i:i + 3]
+        weights[i] = np.clip(np.minimum((freqs - a) / (b - a), (c - freqs) / (c - b)), 0, None)
+    return torch.from_numpy(weights)
+
+
+def mel_bank(rate, size, count, low=40.0, high=16000.0, device="cpu"):
+    return _mel_weights(rate, size, count, low, high).to(device)
+
+
+def mel_spectral_loss(audio, target, rate=48000, floor_db=-60.0):
+    """Log distance on a mel axis up to 16 kHz, above a floor relative to the clip level, plus spectral convergence.
+
+    The linear-frequency log term of spectral_loss spends two thirds of its weight above 8 kHz; this one follows
+    hearing, and the floor stops inaudible detail from counting as much as the voice.
+    """
+    def magnitude(x, size):
+        window = torch.hann_window(size, device=x.device)
+        return torch.stft(x, size, size // 4, window=window, return_complex=True, pad_mode="constant").abs().clamp_min(1e-7)
+    distance = 0
+    for size, count in ((1024, 80), (2048, 128)):
+        bank = mel_bank(rate, size, count, device=audio.device)
+        actual, expected = bank @ magnitude(audio, size), bank @ magnitude(target, size)
+        floor = expected.detach().amax() * 10 ** (floor_db / 20)
+        distance = distance + (torch.log(actual + floor) - torch.log(expected + floor)).abs().mean()
+    convergence = 0
+    for size in (256, 512, 1024):
+        actual, expected = magnitude(audio, size), magnitude(target, size)
+        convergence = convergence + (actual - expected).norm() / expected.norm().clamp_min(1e-5)
+    return distance / 2 + convergence / 3
