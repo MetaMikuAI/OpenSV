@@ -22,7 +22,7 @@ jobs:
           - os: windows-2022
             target: x86_64-pc-windows-msvc
             executable: opensv.exe
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
             executable: opensv
     defaults:
