@@ -243,6 +243,9 @@ class AcousticCore(nn.Module):
                  "spectral_network", "spectral_head", "auxiliary_network", "auxiliary_head")
         nodes = context.children[:3] + latent.children[:3] + model.children[4:8]
         self.networks = nn.ModuleDict({name: Network(node) for name, node in zip(names, nodes)})
+        projection = next(m for m in self.networks["phoneme_encoder"].modules()
+                          if isinstance(m, Network) and m.kind in ("modl0", "modl1"))
+        self.phone_channels = projection.weights[0].shape[1]
         self.speaker_node = model.children[1]
         self.style_node = styles.children[0].children[0]
         self.language_node = context.children[3].children[0]

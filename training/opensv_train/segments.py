@@ -15,6 +15,12 @@ def annotated_segments(conditions, intervals, hop=.005):
     regions = note_regions(intervals)
     output = []
     for condition in conditions:
+        rows = len(condition["counts"])
+        if not rows or len(condition["phones"]) % rows:
+            raise ValueError("Invalid phoneme feature dimensions")
+        channels = len(condition["phones"]) // rows
+        if not channels:
+            raise ValueError("Empty phoneme features")
         frames = sum(condition["counts"])
         origin = condition["start"]
         for start, end in regions:
@@ -28,7 +34,7 @@ def annotated_segments(conditions, intervals, hop=.005):
                 keep = max(0, min(cursor + count, last) - max(cursor, first))
                 if keep:
                     counts.append(keep)
-                    phones.extend(condition["phones"][index * 108:(index + 1) * 108])
+                    phones.extend(condition["phones"][index * channels:(index + 1) * channels])
                     languages.append(condition["languages"][index])
                 cursor += count
             output.append(dict(start=origin + first * hop, phones=phones, counts=counts,

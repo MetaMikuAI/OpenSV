@@ -35,6 +35,10 @@ class PreparationTests(unittest.TestCase):
                     prepare(args)
                 self.assertFalse((args.output / "dataset.json").exists())
 
+    def test_score_error_names_the_project(self):
+        with self.assertRaisesRegex(ValueError, "工程「song.txt」：工程需要 SVP 或 VSQX 文件"):
+            prepare(Namespace(offset=0, project=Path("materials/song.txt")))
+
     def test_batch_splits_sources_and_rejects_duplicates(self):
         def source(args):
             root = args.output

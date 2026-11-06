@@ -34,6 +34,13 @@ class SegmentationTests(unittest.TestCase):
     def test_unannotated_phrase_is_excluded(self):
         self.assertEqual(annotated_segments([self.condition()], [(2, 3, 60)]), [])
 
+    def test_112_channels_preserve_phoneme_rows(self):
+        condition = self.condition()
+        condition["phones"] = [float(i) for i in range(5) for _ in range(112)]
+        result = annotated_segments([condition], [(.3, .5, 62)])[0]
+        self.assertEqual(result["phones"], [3.] * 112)
+        self.assertEqual(result["counts"], [40])
+
     def test_audio_crop_keeps_absolute_position_and_offset(self):
         import numpy as np
         from opensv_train.prepare import crop

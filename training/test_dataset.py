@@ -10,6 +10,8 @@ from opensv_train.__main__ import load_data
 
 
 class ContextStub:
+    phone_channels = 108
+
     def frame_context(self, phones, counts, languages, pitch):
         return torch.zeros((len(pitch), 144))
 

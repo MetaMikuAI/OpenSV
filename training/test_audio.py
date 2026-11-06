@@ -47,7 +47,7 @@ class AudioTests(unittest.TestCase):
             rows.append(dict(id=split, split=split, features=f"{split}.npz", audio=f"{split}.wav"))
         path = self.root / "dataset.json"
         path.write_text(json.dumps(dict(version=1, supervision="audio", samples=rows)))
-        core = SimpleNamespace(frame_context=lambda *args: torch.zeros((2, 144)))
+        core = SimpleNamespace(phone_channels=108, frame_context=lambda *args: torch.zeros((2, 144)))
         objective = SimpleNamespace(vocoder=SimpleNamespace(sample_rate=48000, hop=240))
         groups, _ = load_data(path, core, "acoustic", objective)
         self.assertEqual(groups["train"][0][2][1].shape, (480,))

@@ -83,7 +83,10 @@ def crop(audio, first, length):
 def prepare(args):
     if not math.isfinite(args.offset) or abs(args.offset) > 600:
         raise ValueError("音频偏移无效")
-    project, intervals = load_score(args.project)
+    try:
+        project, intervals = load_score(args.project)
+    except ValueError as error:
+        raise ValueError(f"工程「{Path(args.project).name}」：{error}") from error
     if not args.dictionary and any(not note.get("phonemes", "").strip()
                                    for track in project["tracks"] for note in track["mainGroup"]["notes"]):
         raise ValueError("工程只有歌词，缺少发音词典。请展开「引擎与发音词典」并填写词典目录或 JSON 文件，再检查切分。")
@@ -155,7 +158,7 @@ def prepare(args):
         if np.median(difference) > 2:
             warnings.append(f"片段 {index + 1} 实测音高与音符偏差较大，请检查移调、错位或音高提取。")
         name = f"segment-{index + 1:04d}"
-        np.savez(root / f"{name}.npz", phones=np.asarray(condition["phones"], np.float32).reshape(-1, 108),
+        np.savez(root / f"{name}.npz", phones=np.asarray(condition["phones"], np.float32).reshape(len(counts), -1),
                  counts=counts, languages=np.asarray(condition["languages"], np.int64),
                  noise=np.asarray(condition["noise"], np.float32).reshape(frames, 4),
                  pitch=normalizer(torch.from_numpy(log_f0)).detach().numpy(), log_f0=log_f0)

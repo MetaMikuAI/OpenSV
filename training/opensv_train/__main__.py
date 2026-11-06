@@ -59,7 +59,7 @@ def load_data(path, core, scope="embeddings", objective=None):
                 if value.ndim != 2 or value.shape[1] != width or not len(value) or not np.isfinite(value).all():
                     raise ValueError(f"{name}: invalid {key} shape or values")
                 return torch.from_numpy(value.copy())
-            phones, pitch = matrix("phones", 108), matrix("pitch", 1)
+            phones, pitch = matrix("phones", core.phone_channels), matrix("pitch", 1)
             noise = matrix("noise", 4)
             if objective is None:
                 target = matrix("target", 71)
