@@ -2,83 +2,348 @@
 <html lang="zh-CN">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OpenSV · 训练</title>
+<title>OpenSV · 模型训练</title>
+<script>
+try{const theme=localStorage.getItem('opensv-theme');if(theme)document.documentElement.dataset.theme=theme}catch{}
+</script>
 <style>
-:root{font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;color:#253b37;background:#f4f6f3;font-size:13px}
-*{box-sizing:border-box}body{margin:0}main{max-width:1240px;margin:20px auto;padding:0 20px}
-header,.header-tools{display:flex;justify-content:space-between;align-items:center;gap:10px}header{margin-bottom:16px}
-h1{font-size:25px;letter-spacing:-1px;margin:0}h1 span{font-weight:400;color:#7b8981}
-.badge{border:1px solid #cedcd1;border-radius:20px;padding:6px 10px;font-size:12px;white-space:nowrap}.header-tools select{width:auto;margin:0}
-.layout{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:16px}
-.card{background:white;border:1px solid #e0e7df;border-radius:12px;padding:16px;margin-bottom:12px}aside .card{position:sticky;top:16px}
-h2{font-size:15px;margin:0 0 12px}h2 b{color:#829c88;margin-right:9px;font-size:12px}
-label{display:block;color:#596b61;font-size:12px;margin-bottom:10px;min-width:0}
-input,select{display:block;width:100%;padding:7px 9px;border:1px solid #dce4dc;border-radius:7px;background:#fcfdfb;color:#253b37;margin-top:5px;font:inherit;font-size:13px}
-input:focus,select:focus,button:focus-visible{outline:2px solid #9ebaad;outline-offset:1px}input[type=range]{padding:0;accent-color:#527e65}
-.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
-.pair{padding:10px;background:#f7f9f6;border:1px solid #e2e9e1;border-radius:8px;margin-bottom:8px}.pair label{margin:0}
-.pair-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12px}.pair-head strong{margin-right:auto}.pair-head button{padding:5px 9px;font-size:12px}
-.offset{display:flex;align-items:center;gap:4px;white-space:nowrap}.offset input{width:76px;margin:0;padding:5px 6px}
-button{cursor:pointer;border:0;border-radius:7px;padding:9px 12px;font:inherit;background:#eaf0e9;color:#375646}button.primary{background:#355e4e;color:white}button:disabled{opacity:.5;cursor:default}
-.actions{display:flex;gap:8px;flex-wrap:wrap;padding:10px 0;background:#f4f6f3;position:sticky;bottom:0;z-index:1}
-.hint,.footer{font-size:12px;line-height:1.6;color:#748179}.hint{margin:6px 0 10px}.footer{margin:8px 0}.quiet{font-size:11px;color:#829287}
-details{margin-top:10px}summary{cursor:pointer;font-size:12px;color:#748179}.engine-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:8px}.engine-row label{margin:0}.engine-row button{height:32px}#engine-status{margin:6px 0 10px}
-.status{font-size:21px;margin:6px 0 10px}progress{width:100%;height:6px;accent-color:#527e65}.metrics{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}.metric{padding:10px 0;border-bottom:1px solid #eef0eb}.metric span{color:#748179}.metric strong{display:block;margin-top:4px;font-size:20px;font-weight:500;font-variant-numeric:tabular-nums}
-.chart{width:100%;height:170px;margin:10px 0 0;border-radius:8px;background:#f7f9f6}.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;margin:6px 0 10px}.legend span:first-child{color:#8baa9b}.legend span:nth-child(2){color:#3c8365}.legend span:last-child{color:#b97e3e}
-pre{white-space:pre-wrap;overflow:auto;max-height:220px;font-size:11px;color:#718079;line-height:1.6}#error{color:#a13e39;white-space:pre-wrap}#artifacts{font-size:12px;overflow-wrap:anywhere;line-height:1.8}audio{width:100%;margin-top:12px}
-.help{display:inline-block;margin-left:4px;color:#748179;cursor:help;font-size:11px;border:1px solid #cedcd1;border-radius:50%;width:15px;height:15px;text-align:center;line-height:13px;flex-shrink:0}
-.blessing{border-top:1px solid #eef0eb;padding-top:10px}.blessing figure{margin:12px 0 0;text-align:center}.blessing pre{display:inline-block;max-width:100%;max-height:none;margin:0;white-space:pre;text-align:left;font-family:Consolas,"Courier New",monospace;font-size:14px;line-height:1.2;color:#9a8251}.blessing figcaption{margin-top:8px;font-size:12px;color:#8a7857}
-fieldset{border:0;padding:0;margin:0;min-width:0}[hidden]{display:none!important}
-@media(max-width:780px){main{margin:16px auto;padding:0 12px}.layout{grid-template-columns:1fr}aside .card{position:static}}
-@media(max-width:480px){.row{grid-template-columns:1fr}.pair-head{flex-wrap:wrap}.badge{display:none}.card{padding:12px}}
+:root{
+  color-scheme:light;
+  --bg:#f5f6f5;--surface:#fff;--surface-2:#f0f2f1;--line:#e2e5e3;--line-strong:#c9cfcc;
+  --ink:#141c19;--ink-2:#46534e;--ink-3:#66736e;
+  --accent:#0b6e69;--accent-hover:#085a56;--accent-ink:#fff;--accent-soft:#e0f1ef;
+  --danger:#b42318;--danger-soft:#fdecea;--warn:#8a5a00;--warn-soft:#fbf1da;--ok:#17754a;
+  --series-avg:#0c8f86;--series-val:#e4622c;--series-raw:#a7b0ac;
+  --shadow:0 1px 2px rgb(20 28 25/.04),0 8px 24px -16px rgb(20 28 25/.18);
+  --mono:ui-monospace,"Cascadia Mono",Menlo,Consolas,monospace;
+  font-family:Inter,"PingFang SC","Microsoft YaHei UI","Microsoft YaHei","Segoe UI","Noto Sans CJK SC",system-ui,sans-serif;
+  font-size:14px;line-height:1.5;color:var(--ink);background:var(--bg)
+}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+  color-scheme:dark;
+  --bg:#0f1312;--surface:#171c1a;--surface-2:#1f2523;--line:#2a312e;--line-strong:#3c4541;
+  --ink:#e9edeb;--ink-2:#b5bfbb;--ink-3:#8e9a95;
+  --accent:#35b8ac;--accent-hover:#4fcabf;--accent-ink:#04201e;--accent-soft:#12312e;
+  --danger:#f2857a;--danger-soft:#351c19;--warn:#e0b050;--warn-soft:#2f2612;--ok:#5cc792;
+  --series-avg:#23a598;--series-val:#de6f42;--series-raw:#5d6864;
+  --shadow:0 1px 2px rgb(0 0 0/.3)
+}}
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#0f1312;--surface:#171c1a;--surface-2:#1f2523;--line:#2a312e;--line-strong:#3c4541;
+  --ink:#e9edeb;--ink-2:#b5bfbb;--ink-3:#8e9a95;
+  --accent:#35b8ac;--accent-hover:#4fcabf;--accent-ink:#04201e;--accent-soft:#12312e;
+  --danger:#f2857a;--danger-soft:#351c19;--warn:#e0b050;--warn-soft:#2f2612;--ok:#5cc792;
+  --series-avg:#23a598;--series-val:#de6f42;--series-raw:#5d6864;
+  --shadow:0 1px 2px rgb(0 0 0/.3)
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg)}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+h1,h2,h3,p,figure{margin:0}
+.shell{max-width:1360px;margin:0 auto;padding:0 28px 32px}
+
+/* Header */
+.topbar{display:flex;align-items:center;gap:12px;padding:16px 0}
+.brand{display:flex;align-items:center;gap:10px;margin-right:auto;min-width:0}
+.brand svg{flex:none;color:var(--accent)}
+h1{font-size:17px;font-weight:650;letter-spacing:-.01em;white-space:nowrap}
+h1 span{font-weight:400;color:var(--ink-3);margin-left:6px}
+.pill{display:inline-flex;align-items:center;gap:7px;height:30px;padding:0 11px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink-2);font-size:12.5px;white-space:nowrap}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--ink-3)}
+.pill[data-tone=busy] i{background:var(--accent);animation:pulse 1.6s ease-in-out infinite}
+.pill[data-tone=ok] i{background:var(--ok)}
+.pill[data-tone=error] i{background:var(--danger)}
+@keyframes pulse{50%{opacity:.35}}
+.segmented{display:inline-flex;padding:2px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line)}
+.segmented label{position:relative;display:block;cursor:pointer}
+.segmented input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.segmented span{display:block;padding:4px 11px;border-radius:7px;color:var(--ink-2);font-size:13px;white-space:nowrap}
+.segmented input:checked+span{background:var(--surface);color:var(--ink);font-weight:550;box-shadow:0 1px 2px rgb(0 0 0/.12)}
+.segmented input:focus-visible+span{outline:2px solid var(--accent);outline-offset:1px}
+.icon-button{display:grid;place-items:center;width:30px;height:30px;padding:0;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink-2);cursor:pointer}
+.icon-button:hover{color:var(--ink);border-color:var(--line-strong)}
+
+/* Workspace */
+.workspace{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+form{display:grid;gap:14px;min-width:0}
+fieldset{border:0;padding:0;margin:0;min-width:0;display:grid;gap:14px}
+.group{padding:18px 20px 20px}
+.group>h2,.group>summary{font-size:14.5px;font-weight:620;letter-spacing:-.005em;margin:0 0 14px}
+details.group>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;margin:-18px -20px -20px;padding:16px 20px;border-radius:12px}
+details.group>summary:hover{background:var(--surface-2)}
+details.group[open]>summary{margin-bottom:0;border-radius:12px 12px 0 0}
+details.group[open]>.body{padding-top:16px}
+summary::-webkit-details-marker{display:none}
+.chevron{transition:transform .15s;color:var(--ink-3)}
+details[open]>summary .chevron{transform:rotate(180deg)}
+.stack{display:grid;gap:14px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px 14px}
+
+/* Fields */
+.field{display:block;min-width:0}
+.field-label{display:flex;align-items:center;gap:6px;margin-bottom:6px;color:var(--ink-2);font-size:13px;font-weight:500}
+input:not([type=checkbox],[type=radio],[type=range]),select{display:block;width:100%;height:36px;padding:0 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);outline:0;transition:border-color .12s,box-shadow .12s}
+input.path{font-family:var(--mono);font-size:12.5px}
+input::placeholder{font-family:Inter,"PingFang SC","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC",sans-serif;font-size:13px;color:var(--ink-3);opacity:.85}
+input:hover:not(:disabled),select:hover:not(:disabled){border-color:var(--ink-3)}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input:disabled,select:disabled{background:var(--surface-2);color:var(--ink-3);cursor:not-allowed}
+input[type=range]{display:block;width:100%;margin:10px 0 0;accent-color:var(--accent);height:16px}
+:is(a,button,summary,input[type=checkbox]):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{display:block;color:var(--ink-3);font-size:12.5px;line-height:1.6}
+.field .hint{margin-top:5px}
+.help{display:inline-grid;place-items:center;width:16px;height:16px;padding:0;border:1px solid var(--line-strong);border-radius:50%;background:none;color:var(--ink-3);font-size:10.5px;font-weight:600;line-height:1;cursor:pointer;flex:none}
+.help:hover,.help[aria-expanded=true]{color:var(--accent);border-color:var(--accent)}
+.field-help{display:block;margin:6px 0 0;padding:8px 10px;border-radius:7px;background:var(--surface-2);color:var(--ink-2);font-size:12.5px;line-height:1.6}
+.choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.choice label{position:relative;display:block;cursor:pointer}
+.choice input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.choice span{display:flex;align-items:center;justify-content:center;min-height:36px;padding:6px 10px;border:1px solid var(--line-strong);border-radius:8px;color:var(--ink-2);font-size:13px;text-align:center}
+.choice input:checked+span{border-color:var(--accent);background:var(--accent-soft);color:var(--ink);font-weight:550}
+.choice input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Material pairs */
+#pairs{display:grid;gap:10px}
+.pair{padding:12px 14px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.pair-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}
+.pair-head strong{font-weight:600;margin-right:auto}
+.pair input:not([type=checkbox]):not(:disabled){background:var(--surface)}
+.offset{display:flex;align-items:center;gap:6px;color:var(--ink-2);white-space:nowrap;font-size:12.5px}
+.offset input:not([type=checkbox]){width:72px;height:30px;padding:0 8px}
+.pair input:disabled{background:var(--bg)}
+.offset .field-help{white-space:normal}
+.pair .stack{gap:10px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:520;white-space:nowrap;cursor:pointer;transition:background .12s,border-color .12s}
+.btn:hover:not(:disabled){background:var(--surface-2);border-color:var(--ink-3)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover:not(:disabled){background:var(--accent-hover);border-color:var(--accent-hover)}
+.btn.small{height:30px;padding:0 10px;font-size:12.5px}
+.btn.ghost{border-color:transparent;background:none;color:var(--ink-2)}
+.btn.ghost:hover:not(:disabled){background:var(--surface-2);border-color:transparent;color:var(--ink)}
+.btn.add{width:100%;border-style:dashed;margin-top:10px;color:var(--ink-2)}
+.inline-action{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start}
+.inline-action>.btn{margin-top:25px}
+#segment-row>.btn{margin-top:0}
+
+/* Action bar */
+.actions{position:sticky;bottom:12px;z-index:3;display:flex;flex-wrap:wrap;align-items:center;gap:10px 8px;padding:12px 14px}
+.actions::after{content:"";position:absolute;left:-1px;right:-1px;top:calc(100% + 1px);height:12px;background:var(--bg)}
+.confirm{display:flex;align-items:center;gap:8px;flex-basis:100%;font-size:13px;color:var(--ink-2);cursor:pointer}
+.confirm input{width:16px;height:16px;margin:0;accent-color:var(--accent);flex:none}
+.confirm.attention{margin:-4px -6px;padding:4px 6px;border-radius:7px;background:var(--accent-soft);color:var(--ink);font-weight:550}
+
+/* Monitor */
+.monitor{container-type:inline-size;position:sticky;top:12px;display:grid;gap:14px;max-height:calc(100vh - 24px);overflow:auto;padding:18px 20px 20px;scrollbar-width:thin}
+.steps{display:flex;list-style:none;margin:0;padding:0;gap:4px}
+.steps li{flex:1;min-width:0;font-size:12px;color:var(--ink-3)}
+.steps li::before{content:"";display:block;height:3px;margin-bottom:6px;border-radius:2px;background:var(--line)}
+.steps li span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.steps li.done::before{background:var(--accent);opacity:.45}
+.steps li.current{color:var(--ink);font-weight:600}
+.steps li.current::before{background:var(--accent);opacity:1}
+.steps li.failed{color:var(--danger);font-weight:600}
+.steps li.failed::before{background:var(--danger)}
+.status-line{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.status{font-size:22px;font-weight:620;letter-spacing:-.015em;line-height:1.25}
+.status[data-tone=error]{color:var(--danger)}
+.eta{color:var(--ink-3);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+progress{display:block;width:100%;height:6px;border:0;border-radius:3px;overflow:hidden;background:var(--surface-2);accent-color:var(--accent);appearance:none}
+progress::-webkit-progress-bar{background:var(--surface-2)}
+progress::-webkit-progress-value{background:var(--accent);border-radius:3px;transition:width .4s}
+progress::-moz-progress-bar{background:var(--accent)}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 1px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--line)}
+.metric{display:grid;grid-row:span 3;grid-template-rows:subgrid;row-gap:2px;background:var(--surface);padding:10px 12px;min-width:0}
+.metric span{color:var(--ink-3);font-size:11.5px;line-height:1.35;margin-bottom:4px}
+.metric strong{font-size:17px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.metric small{color:var(--ink-3);font-size:11.5px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chart-wrap{position:relative}
+.chart{display:block;width:100%;height:210px;touch-action:none}
+.grid-line{stroke:var(--line);stroke-width:1}
+.axis-text{fill:var(--ink-3);font-size:11px;font-variant-numeric:tabular-nums}
+.empty-text{fill:var(--ink-3);font-size:13px}
+.line-raw{fill:none;stroke:var(--series-raw);stroke-width:1;stroke-linejoin:round;opacity:.6}
+.line-avg{fill:none;stroke:var(--series-avg);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.line-val{fill:none;stroke:var(--series-val);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+.dot-val{fill:var(--series-val);stroke:var(--surface);stroke-width:2}
+.dot-avg{fill:var(--series-avg);stroke:var(--surface);stroke-width:2}
+.crosshair{stroke:var(--ink-3);stroke-width:1;stroke-dasharray:3 3}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:4px 0 0;padding:0;list-style:none;font-size:12px;color:var(--ink-2)}
+.legend li{display:inline-flex;align-items:center;gap:6px}
+.legend i{display:block;width:14px;height:3px;border-radius:2px}
+.legend .raw i{height:1px;background:var(--series-raw)}
+.legend .avg i{background:var(--series-avg)}
+.legend .val i{background:var(--series-val)}
+.tooltip{position:absolute;top:6px;z-index:2;min-width:150px;padding:7px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);box-shadow:0 6px 18px -8px rgb(0 0 0/.3);font-size:12px;line-height:1.6;pointer-events:none;font-variant-numeric:tabular-nums}
+.tooltip b{display:block;font-weight:600}
+.tooltip div{display:flex;justify-content:space-between;gap:14px;color:var(--ink-2)}
+.tooltip div span:last-child{color:var(--ink)}
+
+/* Blocks inside the monitor */
+.block{border-top:1px solid var(--line);padding-top:14px;display:grid;gap:10px}
+.block h3{font-size:13px;font-weight:620}
+.alert{margin:0;padding:9px 12px;border-radius:8px;background:var(--danger-soft);color:var(--danger);font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}
+.alert:empty{display:none}
+.summary{display:flex;flex-wrap:wrap;gap:8px 24px}
+.summary div{font-size:12px;color:var(--ink-3)}
+.summary strong{display:block;font-size:17px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.notes{display:grid;gap:6px;margin:0;padding:0;list-style:none;font-size:12.5px;line-height:1.55}
+.notes li{padding:6px 10px;border-radius:7px;background:var(--warn-soft);color:var(--ink);overflow-wrap:anywhere}
+.notes li.error{background:var(--danger-soft);color:var(--danger)}
+audio{display:block;width:100%;height:36px}
+.files{display:grid;gap:6px;margin:0;padding:0;list-style:none}
+.files li{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:5px 6px 5px 10px;border-radius:7px;background:var(--surface-2)}
+.files code{font-family:var(--mono);font-size:11.5px;overflow-wrap:anywhere;color:var(--ink-2)}
+.more>summary{cursor:pointer;font-size:13px;color:var(--ink-2);list-style:none;display:flex;align-items:center;gap:6px}
+.more>summary:hover{color:var(--ink)}
+.logs{margin:10px 0 0;max-height:240px;overflow:auto;padding:10px 12px;border-radius:8px;background:var(--surface-2);font-family:var(--mono);font-size:11px;line-height:1.6;color:var(--ink-2);white-space:pre-wrap;overflow-wrap:anywhere}
+.notes-plain{display:grid;gap:8px;margin:12px 0 0;padding:0;list-style:none;color:var(--ink-2);font-size:12.5px;line-height:1.65}
+.buddha{margin:14px 0 0;text-align:center}
+.buddha pre{display:inline-block;max-width:100%;overflow:auto;margin:0;text-align:left;font-family:var(--mono);font-size:12.5px;line-height:1.2;color:var(--ink-3)}
+.buddha figcaption{margin-top:8px;font-size:12px;color:var(--ink-3)}
+
+@container(max-width:520px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:1px}}
+@media(max-width:1000px){
+  .workspace{grid-template-columns:minmax(0,1fr)}
+  .monitor{position:static;max-height:none;overflow:visible}
+  body[data-busy] .monitor{order:-1}
+}
+@media(max-width:560px){
+  .shell{padding:0 16px 24px}
+  .row{grid-template-columns:minmax(0,1fr)}
+  .group,.monitor{padding-left:14px;padding-right:14px}
+  details.group>summary{margin-left:-14px;margin-right:-14px;padding-left:14px;padding-right:14px}
+  .pill{display:none}
+  .actions{bottom:0}
+  .actions .btn{flex:1 1 auto}
+  .pair-head{flex-wrap:wrap}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
-<main>
-<header><h1>OpenSV <span>/ 训练</span></h1><div class="header-tools"><span class="badge">本地运行</span><select id="ui-language" aria-label="Interface language"><option value="zh">中文</option><option value="en">English</option></select></div></header>
-<div class="layout">
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-chevron" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-theme" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2.4a5.6 5.6 0 010 11.2z" fill="currentColor"/></symbol>
+</svg>
+<div class="shell">
+<header class="topbar">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true"><path d="M2 17h3.5c2 0 2.4-8 4.5-8h3c2.2 0 2.2 3.6 4.4 3.6 1.5 0 1.6-1.8 3-1.8 1.3 0 1.5 1.8 3.6 1.8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h1>OpenSV <span>模型训练</span></h1>
+  </div>
+  <span class="pill" id="pill" data-tone="idle"><i></i><span id="pill-text">本地运行</span></span>
+  <div class="segmented" role="group" aria-label="Interface language" data-dynamic>
+    <label><input type="radio" name="ui-language" value="zh"><span>中文</span></label>
+    <label><input type="radio" name="ui-language" value="en"><span>EN</span></label>
+  </div>
+  <button type="button" class="icon-button" id="theme" aria-label="切换深浅色" title="切换深浅色"><svg width="16" height="16"><use href="#i-theme"/></svg></button>
+</header>
+
+<div class="workspace">
 <form id="form">
 <fieldset id="inputs">
-<section class="card"><h2><b>01</b>训练材料</h2>
-<label>数据来源<select id="mode" name="mode"><option value="pair">干声 WAV ＋ SVP／VSQX 工程</option><option value="dataset">已有干声数据集</option></select></label>
-<label>底模声库<input name="voice" placeholder="SVPK 声库包或 voice.nofs" required></label>
-<div id="pair-fields">
-<div id="pairs"></div><button type="button" id="add-pair">＋ 添加一组材料</button>
-<p class="hint">每组材料对应同一段演唱，自动切分与划分训练／验证集。音频偏移通常保持 0。</p></div>
-<div id="dataset-fields" hidden><label>数据集清单<input name="dataset" placeholder="dataset.json"></label><p class="hint">选择此前生成的清单，同目录需有底模与声码器。</p></div>
-<label>工作目录<input name="output" placeholder="新建目录；续训时填写之前的工作目录" required></label>
-</section>
-<section class="card"><h2><b>02</b>训练设置</h2>
-<div class="row"><div><label id="epochs-field">累计训练轮数<input name="epochs" type="number" min="0.000001" max="10000000" step="any" value="2" required></label><label id="steps-field" hidden>累计训练步数<input name="steps" type="number" min="1" max="10000000" value="100"></label></div><label>本次时间上限（秒）<input name="seconds" type="number" min="1" max="604800" value="1800" required></label></div>
-<p id="training-target" class="hint">检查切分后，将按训练片段数换算总步数。</p>
-<p class="hint">训练声学网络；时长、自动音高和声码器保持固定。时间限制不包含数据准备与导出。</p>
-<div class="row"><label>试听工程（选填）<input name="preview" placeholder="使用未参与训练的 song.svp"></label><label>试听语言<select name="preview_language"><option value="">跟随材料语言</option><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label></div>
-<div class="row"><label>材料语言<select name="language"><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label><label>训练设备<select name="device"><option value="cpu">CPU</option><option value="cuda" disabled>NVIDIA GPU（CUDA）</option><option value="mps" disabled>Apple GPU（MPS）</option></select></label></div>
-<p id="device-status" class="hint">正在检测训练设备…</p>
-<div class="row"><label>学习率<input name="lr" type="number" step="any" value="0.000001" min="0.000000001" max="1"><input id="lr-slider" aria-label="学习率滑条" type="range" min="-7" max="-3" step="0.1" value="-6"><span class="quiet">0.0000001 — 0.001，可直接输入数值</span></label><label>CPU 线程<input name="threads" type="number" min="1" max="256" value="4"></label></div>
-<details><summary>高级设置</summary>
-<div class="row"><label>训练目标单位<select id="training-unit"><option value="epochs">轮数</option><option value="steps">步数</option></select></label><label>批次大小<input value="1" disabled title="当前每一步训练一个片段，批次大小固定为 1。"></label></div>
-</details>
-<details open><summary>引擎与发音词典</summary>
-<div class="engine-row"><label>OpenSV 引擎<input name="engine" placeholder="编译好的 opensv 程序路径" required></label><button type="button" id="check-engine">检查引擎</button></div>
-<p class="hint" id="engine-status">需要已编译的 OpenSV 引擎；可使用现有程序，或从源码构建。</p>
-<div class="row"><label>发音词典<input name="dictionary" placeholder="clf-data 目录或自定义 JSON 文件"></label><label>试听词典（选填）<input name="preview_dictionary" placeholder="留空沿用材料词典"></label></div>
-</details></section>
+  <section class="panel group">
+    <h2>训练材料</h2>
+    <div class="stack">
+      <div class="field">
+        <div class="field-label">数据来源</div>
+        <div class="choice">
+          <label><input type="radio" name="mode" value="pair" checked><span>干声 WAV ＋ SVP／VSQX 工程</span></label>
+          <label><input type="radio" name="mode" value="dataset"><span>已有干声数据集</span></label>
+        </div>
+      </div>
+      <label class="field"><span class="field-label">底模声库</span><input class="path" name="voice" placeholder="SVPK 声库包或 voice.nofs" required></label>
+      <div id="pair-fields">
+        <div id="pairs"></div>
+        <button type="button" class="btn add" id="add-pair">＋ 添加一组材料</button>
+        <p class="hint" style="margin-top:8px">每组材料对应同一段演唱，自动切分与划分训练／验证集。音频偏移通常保持 0。</p>
+      </div>
+      <div id="dataset-fields" hidden>
+        <label class="field"><span class="field-label">数据集清单</span><input class="path" name="dataset" placeholder="dataset.json"><span class="hint">选择此前生成的清单，同目录需有底模与声码器。</span></label>
+      </div>
+      <label class="field"><span class="field-label">工作目录</span><input class="path" name="output" placeholder="新建目录；续训时填写之前的工作目录" required></label>
+    </div>
+  </section>
+
+  <section class="panel group">
+    <h2>训练设置</h2>
+    <div class="stack">
+      <div class="row">
+        <div>
+          <label class="field" id="epochs-field"><span class="field-label">累计训练轮数</span><input name="epochs" type="number" min="0.000001" max="10000000" step="any" value="2" required></label>
+          <label class="field" id="steps-field" hidden><span class="field-label">累计训练步数</span><input name="steps" type="number" min="1" max="10000000" value="100"></label>
+        </div>
+        <label class="field"><span class="field-label">本次时间上限（秒）</span><input name="seconds" type="number" min="1" max="604800" value="1800" required></label>
+      </div>
+      <p id="training-target" class="hint" style="margin-top:-6px">检查切分后，将按训练片段数换算总步数。</p>
+      <div class="row">
+        <label class="field"><span class="field-label">材料语言</span><select name="language"><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label>
+        <label class="field"><span class="field-label">训练设备</span><select name="device"><option value="cpu">CPU</option><option value="cuda" disabled>NVIDIA GPU（CUDA）</option><option value="mps" disabled>Apple GPU（MPS）</option></select><span id="device-status" class="hint">正在检测训练设备…</span></label>
+      </div>
+      <div class="row">
+        <label class="field"><span class="field-label">学习率</span><input name="lr" type="number" step="any" value="0.000001" min="0.000000001" max="1"><input id="lr-slider" aria-label="学习率滑条" type="range" min="-7" max="-3" step="0.1" value="-6"><span class="hint">0.0000001 — 0.001，可直接输入数值</span></label>
+        <label class="field"><span class="field-label">CPU 线程</span><input name="threads" type="number" min="1" max="256" value="4"></label>
+      </div>
+      <div class="row">
+        <label class="field"><span class="field-label">试听工程（选填）</span><input class="path" name="preview" placeholder="使用未参与训练的 song.svp"></label>
+        <label class="field"><span class="field-label">试听语言</span><select name="preview_language"><option value="">跟随材料语言</option><option value="mandarin">中文（普通话）</option><option value="japanese">日语</option></select></label>
+      </div>
+      <details class="more">
+        <summary><svg width="14" height="14" class="chevron"><use href="#i-chevron"/></svg>高级设置</summary>
+        <div class="row" style="margin-top:12px">
+          <label class="field"><span class="field-label">训练目标单位</span><select id="training-unit"><option value="epochs">轮数</option><option value="steps">步数</option></select></label>
+          <label class="field"><span class="field-label">批次大小</span><input value="1" disabled title="当前每一步训练一个片段，批次大小固定为 1。"></label>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <details class="panel group" open>
+    <summary>引擎与发音词典<svg width="16" height="16" class="chevron"><use href="#i-chevron"/></svg></summary>
+    <div class="body stack">
+      <div>
+        <div class="inline-action">
+          <label class="field"><span class="field-label">OpenSV 引擎</span><input class="path" name="engine" placeholder="编译好的 opensv 程序路径" required></label>
+          <button type="button" class="btn" id="check-engine">检查引擎</button>
+        </div>
+        <p class="hint" id="engine-status" style="margin-top:6px">需要已编译的 OpenSV 引擎；可使用现有程序，或从源码构建。</p>
+      </div>
+      <div class="row">
+        <label class="field"><span class="field-label">发音词典</span><input class="path" name="dictionary" placeholder="clf-data 目录或自定义 JSON 文件"></label>
+        <label class="field"><span class="field-label">试听词典（选填）</span><input class="path" name="preview_dictionary" placeholder="留空沿用材料词典"></label>
+      </div>
+    </div>
+  </details>
 </fieldset>
-<label id="confirmation"><input id="confirm" type="checkbox" style="display:inline;width:auto;margin-right:6px">我已查看切分与对齐提示，并确认材料对应。</label>
-<div class="actions"><button type="button" id="prepare">检查并切分</button><button class="primary" id="start">开始训练</button><button type="button" id="resume">从工作目录续训</button><button type="button" id="stop" disabled>保存并停止</button></div>
-<p class="footer">续训填写累计目标轮数或步数，沿用原材料与其他设置。</p>
-<p class="hint">失败后无需删除工作目录：切分失败请重新检查并切分；尚无检查点时点击开始训练重试；已有检查点请续训。重试前半成品会保留在 retry-backups。</p>
-</form>
-<aside><section class="card"><h2><b>03</b>进度与结果</h2><div class="status" id="status">准备就绪</div><progress id="progress" max="100" value="0"></progress>
-<div class="metrics"><div class="metric"><span>已完成轮数</span><strong id="epoch">—</strong><small id="step">—</small></div>
-<div class="metric"><span>训练误差 · 当前步</span><strong id="train-loss">—</strong></div>
-<div class="metric"><span>验证误差</span><strong id="loss">—</strong></div>
-<div class="metric"><span>最优检查点</span><strong id="best">—</strong></div></div>
-<svg id="chart" class="chart" viewBox="0 0 480 190" role="img" aria-label="训练与验证误差曲线"></svg><div class="legend"><span>● 训练误差 · 逐步原值</span><span>● 训练误差 · 最近 20 步平均</span><span>● 验证误差 · 检查点</span></div>
-<p class="hint">保留每步原始误差，并叠加最近 20 步平均曲线（不足 20 步使用已有连续记录）；续训恢复历史曲线与平滑窗口。长曲线抽样显示，完整原值保存在 training-history.jsonl。</p>
-<p class="hint">每秒刷新。验证在每 25 步及结束时执行；导出验证误差最低的模型。</p>
-<p id="error" role="alert"></p><div id="review" style="font-size:12px;white-space:pre-wrap;line-height:1.8"></div><select id="segments" aria-label="切分试听" hidden></select><div id="artifacts"></div><audio id="audio" controls hidden></audio>
-<details><summary>运行日志</summary><pre id="logs"></pre></details>
-<details class="blessing" open><summary>赛博佛祖</summary><figure><pre aria-hidden="true">
+
+<div class="panel actions">
+  <label class="confirm" id="confirmation"><input id="confirm" type="checkbox"><span>我已查看切分与对齐提示，并确认材料对应。</span></label>
+  <button type="button" class="btn" id="prepare">检查并切分</button>
+  <button class="btn" id="start">开始训练</button>
+  <button type="button" class="btn ghost" id="resume">从工作目录续训</button>
+  <button type="button" class="btn" id="stop" hidden>保存并停止</button>
+</div>
+
+<details class="panel group">
+  <summary>使用说明<svg width="16" height="16" class="chevron"><use href="#i-chevron"/></svg></summary>
+  <div class="body">
+    <ul class="notes-plain">
+      <li>训练声学网络；时长、自动音高和声码器保持固定。时间限制不包含数据准备与导出。</li>
+      <li>续训填写累计目标轮数或步数，沿用原材料与其他设置。</li>
+      <li>失败后无需删除工作目录：切分失败请重新检查并切分；尚无检查点时点击开始训练重试；已有检查点请续训。重试前半成品会保留在 retry-backups。</li>
+      <li>保留每步原始误差，并叠加最近 20 步平均曲线（不足 20 步使用已有连续记录）；续训恢复历史曲线与平滑窗口。长曲线抽样显示，完整原值保存在 training-history.jsonl。</li>
+      <li>每秒刷新。验证在每 25 步及结束时执行；导出验证误差最低的模型。</li>
+      <li>关闭网页不会停止任务。停止训练后，终端可用 Ctrl+C 退出服务。</li>
+    </ul>
+    <details class="more" style="margin-top:14px">
+      <summary><svg width="14" height="14" class="chevron"><use href="#i-chevron"/></svg>赛博佛祖</summary>
+      <figure class="buddha"><pre aria-hidden="true">
                   _oo0oo_
                  o8888888o
                  88" . "88
@@ -96,12 +361,72 @@ fieldset{border:0;padding:0;margin:0;min-width:0}[hidden]{display:none!important
     | | :  `- \`.;`\ _ /`;.`/ - ` : | |
     \  \ `_.   \_ __\ /__ _/   .-` /  /
 =====`-.____`.___ \_____/___.-`___.-'=====
-                  `=---='
-</pre><figcaption>佛祖保佑，梯度不炸，Loss 下降。</figcaption></figure></details></section>
-<p class="footer">关闭网页不会停止任务。停止训练后，终端可用 Ctrl+C 退出服务。</p>
-</aside></div></main>
-<template id="pair-template"><div class="pair"><div class="pair-head"><strong></strong><label class="offset">音频偏移（秒）<input data-key="offset" type="number" step="any" value="0"></label><button type="button" class="remove-pair">移除</button></div><div class="row"><label>干声 WAV<input data-key="audio" placeholder="完整单人干声 WAV 的路径"></label><label>对应工程<input data-key="project" placeholder="与这段声音对应的 SVP／VSQX 路径"></label></div></div></template>
+                  `=---='</pre><figcaption>佛祖保佑，梯度不炸，Loss 下降。</figcaption></figure>
+    </details>
+  </div>
+</details>
+</form>
+
+<aside class="panel monitor">
+  <ol class="steps" id="steps" aria-label="流程"></ol>
+  <div class="status-line"><div class="status" id="status" role="status" aria-live="polite">准备就绪</div><div class="eta" id="eta"></div></div>
+  <progress id="progress" max="100" value="0" aria-label="训练进度"></progress>
+  <div class="metrics">
+    <div class="metric"><span>已完成轮数</span><strong id="epoch">—</strong><small id="step"></small></div>
+    <div class="metric"><span>训练误差 · 当前步</span><strong id="train-loss">—</strong><small id="train-average"></small></div>
+    <div class="metric"><span>验证误差</span><strong id="loss">—</strong></div>
+    <div class="metric"><span>最优检查点</span><strong id="best">—</strong></div>
+  </div>
+  <p id="error" class="alert" role="alert"></p>
+  <div>
+    <div class="chart-wrap" id="chart-wrap">
+      <svg id="chart" class="chart" role="img" aria-label="训练与验证误差曲线"></svg>
+      <div class="tooltip" id="tooltip" hidden></div>
+    </div>
+    <ul class="legend">
+      <li class="raw"><i></i><span>训练误差 · 逐步原值</span></li>
+      <li class="avg"><i></i><span>训练误差 · 最近 20 步平均</span></li>
+      <li class="val"><i></i><span>验证误差 · 检查点</span></li>
+    </ul>
+  </div>
+  <section class="block" id="review-block" hidden>
+    <h3>切分结果</h3>
+    <div class="summary" id="summary" data-dynamic></div>
+    <ul class="notes" id="review" data-dynamic></ul>
+  </section>
+  <section class="block" id="audio-block" hidden>
+    <h3>试听</h3>
+    <div class="inline-action" id="segment-row" hidden><select id="segments" aria-label="切分试听" data-dynamic></select><button type="button" class="btn" id="play-segment">试听片段</button></div>
+    <audio id="audio" controls hidden></audio>
+  </section>
+  <section class="block" id="files-block" hidden>
+    <h3>输出文件</h3>
+    <ul class="files" id="artifacts" data-dynamic></ul>
+  </section>
+  <details class="more block">
+    <summary><svg width="14" height="14" class="chevron"><use href="#i-chevron"/></svg>运行日志</summary>
+    <pre class="logs" id="logs" data-dynamic></pre>
+  </details>
+</aside>
+</div>
+</div>
+
+<template id="pair-template">
+  <div class="pair">
+    <div class="pair-head">
+      <strong></strong>
+      <label class="offset"><span class="field-label" style="margin:0">音频偏移（秒）</span><input data-key="offset" type="number" step="any" value="0"></label>
+      <button type="button" class="btn ghost small remove-pair">移除</button>
+    </div>
+    <div class="stack">
+      <label class="field"><span class="field-label">干声 WAV</span><input class="path" data-key="audio" placeholder="完整单人干声 WAV 的路径"></label>
+      <label class="field"><span class="field-label">对应工程</span><input class="path" data-key="project" placeholder="与这段声音对应的 SVP／VSQX 路径"></label>
+    </div>
+  </div>
+</template>
+
 <script>
+/* Interface text. Chinese is the source language; backend messages are matched here too. */
 const translations={
 '无音符区域不参与训练；切片按音符边界截取，请检查字头与尾音是否完整。':'Unannotated regions are excluded from training. Clips follow note boundaries; check consonant attacks and endings.',
 '/ 训练':'/ Training','本地运行 · CPU':'Local · CPU','训练材料':'Training materials','数据来源':'Data source','干声 WAV ＋ SVP／VSQX 工程':'Dry WAV + SVP / VSQX score','已有干声数据集':'Prepared dry-audio dataset','底模声库':'Base voice','SVPK 声库包或 voice.nofs':'SVPK package or voice.nofs','＋ 添加一组材料':'+ Add pair','每组材料对应同一段演唱，自动切分与划分训练／验证集。音频偏移通常保持 0。':'Each pair describes the same performance. Clips and train/validation splits are generated automatically. Usually leave the offset at 0.','数据集清单':'Dataset manifest','选择此前生成的清单，同目录需有底模与声码器。':'Use a prepared manifest with its base model and vocoder in the same directory.','工作目录':'Working directory','新建目录；续训时填写之前的工作目录':'New directory, or the previous directory to resume','训练设置':'Training settings','累计训练步数':'Total training steps','本次时间上限（秒）':'Time limit this run (s)','训练声学网络；时长、自动音高和声码器保持固定。时间限制不包含数据准备与导出。':'Trains the acoustic network. Duration, pitch and vocoder stay fixed. Preparation and export are outside the time limit.','试听工程（选填）':'Preview score (optional)','使用未参与训练的 song.svp':'An SVP score not used for training','材料语言':'Material language','中文（普通话）':'Chinese (Mandarin)','日语':'Japanese','学习率':'Learning rate','学习率滑条':'Learning rate slider','0.0000001 — 0.001，可直接输入数值':'0.0000001 — 0.001, or enter a value','CPU 线程':'CPU threads','引擎与发音词典':'Engine and pronunciation dictionary','OpenSV 引擎':'OpenSV engine','编译好的 opensv 程序路径':'Path to the compiled opensv executable','检查引擎':'Check engine','需要已编译的 OpenSV 引擎；可使用现有程序，或从源码构建。':'Requires a compiled OpenSV engine. Use an existing executable or build from source.','发音词典目录':'Pronunciation dictionary directory','clf-data；工程已有显式音素时可留空':'clf-data; optional when the score includes explicit phonemes','我已查看切分与对齐提示，并确认材料对应。':'I reviewed the segmentation and alignment messages and confirmed the pairs.','检查并切分':'Check and split','开始训练':'Start training','从工作目录续训':'Resume training','保存并停止':'Save and stop','续训沿用工作目录内的材料与设置，仅更新累计步数和本次时限。':'Resuming reuses saved materials and settings, updating only total steps and this run’s time limit.','进度与结果':'Progress and results','准备就绪':'Ready','已完成步数':'Completed steps','当前训练误差':'Training loss','验证误差':'Validation loss','最优检查点':'Best checkpoint','训练与验证误差曲线':'Training and validation loss','● 训练误差 · 每步':'● Training · each step','● 验证误差 · 检查点':'● Validation · checkpoints','每秒刷新。验证在每 25 步及结束时执行；导出验证误差最低的模型。':'Updates every second. Validates every 25 steps and at completion. Exports the model with the lowest validation loss.','切分试听':'Preview clips','运行日志':'Run log','关闭网页不会停止任务。停止训练后，终端可用 Ctrl+C 退出服务。':'Closing this page does not stop the task. After stopping training, use Ctrl+C in the terminal to exit.','移除':'Remove','干声 WAV':'Dry WAV','完整单人干声 WAV 的路径':'Path to the full solo dry WAV','对应工程':'Matching score','与这段声音对应的 SVP／VSQX 路径':'Path to the matching SVP / VSQX score','音频偏移（秒）':'Audio offset (s)','准备材料':'Preparing materials','检查与切分':'Checking and splitting','请检查切分结果':'Review the prepared clips','正在训练':'Training','导出声库':'Exporting voice','渲染试听':'Rendering preview','训练完成':'Training complete','已保存进度':'Progress saved','任务未完成':'Task failed','等待保存进度…':'Waiting to save progress…','正在检查…':'Checking…','开始训练后显示误差曲线':'Loss curves appear when training starts','试听读取失败':'Could not load preview audio'
@@ -210,6 +535,7 @@ const messagePatterns=[
 [/^声库已导出，试听渲染失败：([\s\S]+)$/,(_,error)=>`Voice exported, but preview rendering failed: ${message(error)}`],
 [/^CUDA 不可用：(.+)$/,(_,reason)=>`CUDA unavailable: ${message(reason)}`],
 [/^材料 (\d+)：(.+)$/,(_,n,rest)=>`Pair ${n}: ${message(rest)}`],
+[/^工程「(.+)」：(.+)$/,(_,name,rest)=>`Project "${name}": ${message(rest)}`],
 [/^材料 (\d+) 的 (\w+) 文件不存在$/,(_,n,key)=>`Pair ${n}: ${key} file not found.`],
 [/^材料 (\d+) 含重复音频，请移除重复材料后重新导入。$/,(_,n)=>`Pair ${n} contains duplicate audio. Remove duplicates and import again.`],
 [/^路径不存在：(.+)$/,(_,key)=>`Path does not exist: ${key}`],
@@ -224,62 +550,391 @@ const messagePatterns=[
 [/^片段 (\d+) 无法提取可靠音高，已跳过。$/,(_,n)=>`Reliable pitch could not be extracted from clip ${n}; it was skipped.`],
 [/^片段 (\d+) 实测音高与音符偏差较大，请检查移调、错位或音高提取。$/,(_,n)=>`Measured pitch differs substantially from notes in clip ${n}. Check transposition, alignment and pitch extraction.`]
 ];
-let uiLanguage=localStorage.getItem('opensv-language')==='en'?'en':'zh';
+Object.assign(translations,{
+'模型训练':'Training','服务未连接':'Disconnected','切换深浅色':'Toggle light or dark theme','流程':'Workflow','训练进度':'Training progress','使用说明':'Notes',
+'材料':'Materials','检查切分':'Check','确认':'Review','训练':'Train','导出':'Export','完成':'Done',
+'切分结果':'Clips','试听':'Preview','试听片段':'Play clip','输出文件':'Output files','复制':'Copy','已复制':'Copied',
+'训练误差 · 逐步原值':'Training · raw per-step loss','训练误差 · 最近 20 步平均':'Training · last 20-step average','验证误差 · 检查点':'Validation · checkpoints',
+'音素边界先由底模估计，再按音频做 DTW 对齐；这是估计值，不等于人工标注，请试听切片。':'Phoneme boundaries are estimated by the base model, then aligned to the audio with DTW. These are estimates, not manual labels. Please preview the clips.'
+});
+
+/* Language */
 const reverseTranslations=Object.fromEntries(Object.entries(translations).map(([zh,en])=>[en,zh]));
-function translated(text){const original=reverseTranslations[text]||text;return uiLanguage==='en'?(translations[original]||original):original}
-function message(text){text=reverseTranslations[text]||text;if(uiLanguage!=='en')return text;if(translations[text])return translations[text];for(const[pattern,format]of messagePatterns){const match=text.match(pattern);if(match)return format(...match)}return text}
-function showMessage(id,text){$(id).dataset.message=text;$(id).textContent=message(text)}
-function localize(root=document.querySelector('main')){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);while(walker.nextNode()){const node=walker.currentNode;if(node.parentElement.closest('#logs,#error,#artifacts,#review,#ui-language'))continue;const text=node.textContent.trim(),value=translated(text);if(text!==value)node.textContent=node.textContent.replace(text,value)}for(const el of root.querySelectorAll('[placeholder],[title],[aria-label]'))for(const attr of ['placeholder','title','aria-label'])if(el.hasAttribute(attr))el.setAttribute(attr,translated(el.getAttribute(attr)));document.documentElement.lang=uiLanguage==='en'?'en':'zh-CN';document.title='OpenSV · '+(uiLanguage==='en'?'Training':'训练')}
-function addHelp(root){for(const input of root.querySelectorAll('input,select')){const key=input.name||input.dataset.key;if(!help[key])continue;const label=input.closest('label');if(!label||label.querySelector('.help'))continue;const hint=document.createElement('span');hint.className='help';hint.textContent='?';hint.tabIndex=0;hint.title=translated(help[key][0]);hint.setAttribute('aria-label',hint.title);label.insertBefore(hint,input);input.title=hint.title}}
+const storage={get(key){try{return localStorage.getItem(key)}catch{return null}},set(key,value){try{localStorage.setItem(key,value)}catch{}}};
+let uiLanguage=storage.get('opensv-language')==='en'?'en':'zh';
+const english=()=>uiLanguage==='en';
+function t(text){const original=reverseTranslations[text]||text;return english()?(translations[original]||original):original}
+function message(text){text=reverseTranslations[text]||text;if(!english())return text;if(translations[text])return translations[text];for(const[pattern,format]of messagePatterns){const match=text.match(pattern);if(match)return format(...match)}return text}
+function localize(root=document.body){
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+  while(walker.nextNode()){
+    const node=walker.currentNode,parent=node.parentElement;
+    if(!parent||parent.closest('[data-dynamic],script,style,pre,#status,#error,#eta'))continue;
+    if(parent.dataset.message!==undefined)continue;
+    const text=node.textContent.trim(),value=t(text);
+    if(text&&text!==value)node.textContent=node.textContent.replace(text,value);
+  }
+  for(const el of root.querySelectorAll('[placeholder],[title],[aria-label]'))for(const attr of['placeholder','title','aria-label'])if(el.hasAttribute(attr))el.setAttribute(attr,t(el.getAttribute(attr)));
+  document.documentElement.lang=english()?'en':'zh-CN';
+  document.title='OpenSV · '+t('模型训练');
+}
+
+/* Connection */
 const token=location.hash.slice(1)||sessionStorage.getItem('opensv-token')||'';
-sessionStorage.setItem('opensv-token',token);history.replaceState(null,'',location.pathname);
-const $=id=>document.getElementById(id),form=$('form');let lastAudio='',audioUrl='',lastState=null,disconnected=false;
-async function api(path,body){const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{'X-OpenSV-Token':token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});const result=await response.json();if(!response.ok)throw Error(result.error);return result}
-function pairValues(){return [...$('pairs').children].map(row=>({project:row.querySelector('[data-key=project]').value,audio:row.querySelector('[data-key=audio]').value,offset:Number(row.querySelector('[data-key=offset]').value)}))}
-function numberPairs(){[...$('pairs').children].forEach((row,i)=>{row.querySelector('strong').textContent=(uiLanguage==='en'?'Pair ':'材料 ')+(i+1);row.querySelector('button').disabled=$('pairs').children.length===1})}
-function addPair(data={}){const row=$('pair-template').content.firstElementChild.cloneNode(true);for(const input of row.querySelectorAll('input'))if(data[input.dataset.key]!==undefined)input.value=data[input.dataset.key];row.querySelector('button').onclick=()=>{row.remove();numberPairs();$('confirm').checked=false};$('pairs').append(row);addHelp(row);localize(row);numberPairs()}
-$('add-pair').onclick=()=>addPair();addPair();
-function values(){const data=Object.fromEntries(new FormData(form));data.epochs=$('training-unit').value==='epochs'?data.epochs:null;data.pairs=pairValues();data.confirm_alignment=$('confirm').checked;return data}
-function setUnit(unit){$('training-unit').value=unit;const epochs=unit==='epochs';$('epochs-field').hidden=!epochs;$('steps-field').hidden=epochs;form.elements.epochs.required=epochs;form.elements.steps.required=!epochs;form.elements.epochs.disabled=!epochs;form.elements.steps.disabled=epochs;updateTarget()}
+sessionStorage.setItem('opensv-token',token);
+history.replaceState(null,'',location.pathname);
+const $=id=>document.getElementById(id),form=$('form');
+async function api(path,body){
+  const response=await fetch('/api/'+path,{method:body?'POST':'GET',headers:{'X-OpenSV-Token':token,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});
+  const result=await response.json();
+  if(!response.ok)throw Error(result.error);
+  return result;
+}
+function showMessage(id,text){$(id).dataset.message=text;$(id).textContent=message(text)}
+
+/* Inline help: a question mark reveals the explanation under its field */
+function addHelp(root){
+  for(const input of root.querySelectorAll('input,select')){
+    const key=input.name||input.dataset.key;
+    if(!help[key])continue;
+    const field=input.closest('.field,.offset');
+    const title=field&&field.querySelector('.field-label');
+    if(!title||title.querySelector('.help'))continue;
+    const button=document.createElement('button');
+    button.type='button';button.className='help';button.textContent='?';button.setAttribute('aria-expanded','false');button.setAttribute('aria-label',t(help[key][0]));
+    const text=document.createElement('span');
+    text.className='field-help';text.hidden=true;text.dataset.message=help[key][0];text.textContent=message(help[key][0]);
+    button.onclick=event=>{event.preventDefault();text.hidden=!text.hidden;button.setAttribute('aria-expanded',String(!text.hidden))};
+    title.append(button);
+    const head=field.closest('.pair-head');
+    if(head)head.after(text);else field.append(text);
+  }
+}
+
+/* Form */
+const modeValue=()=>form.elements.mode.value;
+function pairValues(){return[...$('pairs').querySelectorAll('.pair')].map(row=>({project:row.querySelector('[data-key=project]').value,audio:row.querySelector('[data-key=audio]').value,offset:Number(row.querySelector('[data-key=offset]').value)}))}
+function numberPairs(){const rows=[...$('pairs').querySelectorAll('.pair')];rows.forEach((row,i)=>{row.querySelector('strong').textContent=(english()?'Pair ':'材料 ')+(i+1);row.querySelector('.remove-pair').disabled=rows.length===1})}
+function addPair(data={}){
+  const row=$('pair-template').content.firstElementChild.cloneNode(true);
+  for(const input of row.querySelectorAll('input'))if(data[input.dataset.key]!==undefined)input.value=data[input.dataset.key];
+  row.querySelector('.remove-pair').onclick=()=>{row.remove();numberPairs();$('confirm').checked=false;updateActions()};
+  $('pairs').append(row);addHelp(row);localize(row);numberPairs();
+}
+function values(){
+  const data=Object.fromEntries(new FormData(form));
+  data.epochs=$('training-unit').value==='epochs'?data.epochs:null;
+  data.pairs=pairValues();
+  data.confirm_alignment=$('confirm').checked;
+  return data;
+}
+function setUnit(unit){
+  $('training-unit').value=unit;
+  const epochs=unit==='epochs';
+  $('epochs-field').hidden=!epochs;$('steps-field').hidden=epochs;
+  form.elements.epochs.required=epochs;form.elements.steps.required=!epochs;
+  form.elements.epochs.disabled=!epochs;form.elements.steps.disabled=epochs;
+  updateTarget();
+}
 function trainCount(){
-const config=lastState?.config;if(!config)return 0;
-if(!lastState.busy&&(form.elements.output.value!==config.output||$('mode').value!==config.mode))return 0;
-if(!lastState.busy&&config.mode==='dataset'&&form.elements.dataset.value!==config.dataset)return 0;
-if(!lastState.busy&&config.mode==='pair'&&JSON.stringify(pairValues())!==JSON.stringify(config.pairs))return 0;
-return Number(config.train_samples||lastState.metrics?.train_samples||lastState.preparation?.train_samples)||0;
+  const config=lastState?.config;
+  if(!config)return 0;
+  if(!lastState.busy&&(form.elements.output.value!==config.output||modeValue()!==config.mode))return 0;
+  if(!lastState.busy&&config.mode==='dataset'&&form.elements.dataset.value!==config.dataset)return 0;
+  if(!lastState.busy&&config.mode==='pair'&&JSON.stringify(pairValues())!==JSON.stringify(config.pairs))return 0;
+  return Number(config.train_samples||lastState.metrics?.train_samples||lastState.preparation?.train_samples)||0;
 }
 function updateTarget(){
-const count=trainCount(),english=uiLanguage==='en';
-if(!count){showMessage('training-target','检查切分后，将按训练片段数换算总步数。');return}
-const steps=$('training-unit').value==='epochs'?Math.ceil(Number(form.elements.epochs.value)*count):Number(form.elements.steps.value);
-if(!Number.isFinite(steps)||steps<1){$('training-target').textContent='—';return}
-$('training-target').textContent=english?`${count} training clips × ${(steps/count).toFixed(2)} epochs ≈ ${steps} steps · batch size 1`:`${count} 个训练片段 × ${(steps/count).toFixed(2)} 轮 ≈ ${steps} 步 · 批次大小 1`;
+  const count=trainCount();
+  if(!count){showMessage('training-target','检查切分后，将按训练片段数换算总步数。');return}
+  const steps=$('training-unit').value==='epochs'?Math.ceil(Number(form.elements.epochs.value)*count):Number(form.elements.steps.value);
+  if(!Number.isFinite(steps)||steps<1){$('training-target').textContent='—';return}
+  delete $('training-target').dataset.message;
+  $('training-target').textContent=english()?`${count} training clips × ${(steps/count).toFixed(2)} epochs ≈ ${steps} steps · batch size 1`:`${count} 个训练片段 × ${(steps/count).toFixed(2)} 轮 ≈ ${steps} 步 · 批次大小 1`;
 }
-function paint(state){lastState=state;$('inputs').disabled=state.busy;$('start').disabled=state.busy;$('prepare').disabled=state.busy;$('resume').disabled=state.busy;$('stop').disabled=!state.busy||state.stop_requested;
-if(state.busy&&state.config){for(const [key,value] of Object.entries(state.config)){const input=form.elements.namedItem(key);if(input&&value!==null)input.value=value}setUnit(state.config.epochs==null?'steps':'epochs');if(JSON.stringify(pairValues())!==JSON.stringify(state.config.pairs)){$('pairs').replaceChildren();state.config.pairs.forEach(addPair)}$('lr-slider').value=Math.log10(Number(form.elements.lr.value));$('mode').onchange()}
-const names={idle:'准备就绪',starting:'准备材料',preparing:'检查与切分',review:'请检查切分结果',training:'正在训练',export:'导出声库',render:'渲染试听',complete:'训练完成',stopped:'已保存进度',error:'任务未完成'};
-$('status').textContent=state.stop_requested&&state.busy?'等待保存进度…':names[state.phase]||state.phase;
-const e=state.metrics||{},count=Number(state.config?.train_samples||e.train_samples)||0;
-if(e.step!==undefined){const target=state.config?.steps||100;$('step').textContent=uiLanguage==='en'?`${e.step} / ${target} steps`:`${e.step} / ${target} 步`;$('epoch').textContent=count?`${(e.step/count).toFixed(2)} / ${(target/count).toFixed(2)}`:'—';$('progress').max=target;$('progress').value=e.step}
-if(e.loss!==undefined)$('train-loss').textContent=Number(e.loss).toFixed(5);drawChart(state.history||[]);updateTarget();
-if(e.validation_loss!==undefined)$('loss').textContent=Number(e.validation_loss).toFixed(5);if(e.best_step!==undefined)$('best').textContent=e.best_step;
-$('logs').textContent=(state.logs||[]).join('\n');if(state.error||state.warning)showMessage('error',state.error||state.warning);$('artifacts').textContent=(state.artifacts||[]).join('\n');
-if(state.preparation){const p=state.preparation,english=uiLanguage==='en';
-const summary=english?`Training ${p.train_samples||0} clips · Validation ${p.validation_samples||0} clips · ${(p.seconds||0).toFixed(1)} s`:`训练 ${p.train_samples||0} 段 · 验证 ${p.validation_samples||0} 段 · ${(p.seconds||0).toFixed(1)} 秒`;
-$('review').textContent=[summary,...(p.errors||[]).map(x=>(english?'Error: ':'错误：')+message(x)),...(p.warnings||[]).map(x=>(english?'Note: ':'提示：')+message(x))].join('\n');
-const selected=p.segments.filter(s=>s.split),cacheKey=state.output+uiLanguage;if($('segments').dataset.output!==cacheKey){const previous=$('segments').value;$('segments').replaceChildren(...selected.map(s=>{const option=document.createElement('option');option.value=s.id;option.textContent=`${s.id} · ${s.start.toFixed(2)}–${s.end.toFixed(2)} ${english?'s':'秒'} · ${s.split==='train'?(english?'Training':'训练'):(english?'Validation':'验证')}`;return option}));if(selected.some(s=>s.id===previous))$('segments').value=previous;$('segments').dataset.output=cacheKey}$('segments').hidden=!selected.length;}
+function syncMode(){
+  const pair=modeValue()==='pair';
+  $('pair-fields').hidden=!pair;$('dataset-fields').hidden=pair;
+  drawSteps();updateActions();
+}
 
-if(state.audio&&lastAudio!==state.audio){lastAudio=state.audio;play('/api/audio')}localize()}
-async function play(path){try{const r=await fetch(path,{headers:{'X-OpenSV-Token':token}});if(!r.ok)throw Error('试听读取失败');const b=await r.blob();if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(b);$('audio').src=audioUrl;$('audio').hidden=false}catch(e){showMessage('error',e.message)}}
-async function start(action){try{showMessage('error','');const result=await api(action,values());for(const id of ['epoch','step','train-loss','loss','best'])$(id).textContent='—';$('progress').value=0;$('audio').hidden=true;$('review').textContent='';$('segments').hidden=true;paint(result)}catch(e){showMessage('error',e.message)}}
-form.onsubmit=e=>{e.preventDefault();start('start')};$('prepare').onclick=()=>{$('confirm').checked=false;start('prepare')};$('resume').onclick=()=>start('resume');$('stop').onclick=()=>api('stop',{}).then(paint).catch(e=>showMessage('error',e.message));$('segments').onchange=()=>play('/api/audio?segment='+encodeURIComponent($('segments').value));
-$('mode').onchange=()=>{const pair=$('mode').value==='pair';$('pair-fields').hidden=!pair;$('dataset-fields').hidden=pair;$('prepare').hidden=!pair;$('confirmation').hidden=!pair};
-api('defaults').then(d=>{if(!form.elements.engine.value)form.elements.engine.value=d.engine;for(const device of ['cuda','mps'])form.elements.device.querySelector(`[value=${device}]`).disabled=!d[device+'_available'];showMessage('device-status',d.mps_available?'CPU 与 Apple GPU（MPS）均可选；声码器与频谱损失使用 CPU。':d.cuda_available?'CPU 与 NVIDIA GPU 均可选。':d.cuda_reason)}).catch(e=>showMessage('device-status',e.message));
-$('training-unit').onchange=()=>{const unit=$('training-unit').value,count=trainCount();if(count){if(unit==='steps')form.elements.steps.value=Math.ceil(Number(form.elements.epochs.value)*count);else form.elements.epochs.value=Number(form.elements.steps.value)/count}setUnit(unit)};form.addEventListener('input',updateTarget);
-$('lr-slider').oninput=()=>form.elements.lr.value=Number((10**Number($('lr-slider').value)).toPrecision(3));form.elements.lr.oninput=()=>$('lr-slider').value=Math.log10(Number(form.elements.lr.value));
-$('check-engine').onclick=async()=>{try{showMessage('engine-status','正在检查…');showMessage('engine-status',(await api('engine',{engine:form.elements.engine.value})).message)}catch(e){showMessage('engine-status',e.message)}};
-function drawChart(history){const svg=$('chart');svg.replaceChildren();const all=history.flatMap(p=>[p.loss,p.loss_average,p.validation_loss]).filter(Number.isFinite);const node=(tag,attrs,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el};if(!all.length){node('text',{x:240,y:95,'text-anchor':'middle',fill:'#819087','font-size':13},'开始训练后显示误差曲线');return}const low=Math.min(...all),high=Math.max(...all),span=high-low||Math.max(high*.1,.01),maxStep=Math.max(1,...history.map(p=>p.step)),x=v=>48+v/maxStep*415,y=v=>155-(v-low)/span*125;for(let i=0;i<3;i++){const v=low+span*i/2;node('line',{x1:48,x2:463,y1:y(v),y2:y(v),stroke:'#e1e8df'});node('text',{x:42,y:y(v)+4,'text-anchor':'end',fill:'#819087','font-size':10},v.toFixed(3))}node('text',{x:48,y:179,fill:'#819087','font-size':10},'0');node('text',{x:463,y:179,'text-anchor':'end',fill:'#819087','font-size':10},maxStep+(uiLanguage==='en'?' steps':' 步'));for(const[key,color]of [['loss','#8baa9b'],['loss_average','#3c8365'],['validation_loss','#b97e3e']]){const points=history.filter(p=>Number.isFinite(p[key]));node('polyline',{points:points.map(p=>x(p.step)+','+y(p[key])).join(' '),fill:'none',stroke:color,'stroke-width':key==='loss'?1:2});for(const p of points)node('circle',{cx:x(p.step),cy:y(p[key]),r:key==='loss'?1:2,fill:color})}}
-addHelp(form);setUnit('epochs');localize();$('ui-language').value=uiLanguage;$('ui-language').onchange=()=>{uiLanguage=$('ui-language').value;localStorage.setItem('opensv-language',uiLanguage);localize();numberPairs();for(const id of ['error','engine-status','device-status'])if($(id).dataset.message)showMessage(id,$(id).dataset.message);if(lastState)paint(lastState);else updateTarget()};
-async function poll(){try{const state=await api('state');if(disconnected){disconnected=false;showMessage('error','')}paint(state)}catch(e){disconnected=true;$('error').textContent=(uiLanguage==='en'?'Service disconnected: ':'服务未连接：')+e.message}setTimeout(poll,1000)}poll();
+/* Workflow state */
+const STEP_NAMES={ready:'材料',check:'检查切分',review:'确认',train:'训练',export:'导出',done:'完成'};
+const PHASE_NAMES={idle:'准备就绪',starting:'准备材料',preparing:'检查与切分',review:'请检查切分结果',training:'正在训练',export:'导出声库',render:'渲染试听',complete:'训练完成',stopped:'已保存进度',error:'任务未完成'};
+let lastState=null,disconnected=false,lastAudio='',audioUrl='',lastStep='ready',samples=[],lastLogs='',lastFiles='',chartKey='';
+function currentStep(state){
+  const phase=state?.phase||'idle';
+  if(phase==='starting')return state.preparation?'train':'check';
+  if(phase==='error'&&lastStep==='ready')return state.metrics?.step!==undefined?'train':state.preparation?'review':'check';
+  return{idle:'ready',preparing:'check',review:'review',training:'train',export:'export',render:'export',complete:'done',stopped:'train'}[phase]||lastStep;
+}
+function drawSteps(){
+  const mode=lastState?.busy&&lastState.config?lastState.config.mode:modeValue();
+  const names=Object.keys(STEP_NAMES).filter(step=>mode==='pair'||(step!=='check'&&step!=='review'));
+  const current=currentStep(lastState);
+  if(lastState&&lastState.phase!=='error')lastStep=current;
+  const index=names.indexOf(current),failed=lastState?.phase==='error',finished=current==='done';
+  $('steps').replaceChildren(...names.map((step,i)=>{
+    const item=document.createElement('li'),label=document.createElement('span');
+    label.textContent=t(STEP_NAMES[step]);item.append(label);
+    if(i===index&&failed)item.className='failed';
+    else if(i===index)item.className=finished?'done current':'current';
+    else if(i<index)item.className='done';
+    if(i===index)item.setAttribute('aria-current','step');
+    return item;
+  }));
+}
+function updateActions(){
+  const state=lastState||{},busy=Boolean(state.busy),pair=modeValue()==='pair';
+  const reviewed=state.phase==='review'&&!(state.preparation?.errors||[]).length;
+  $('prepare').hidden=busy||!pair;$('confirmation').hidden=busy||!pair;
+  $('start').hidden=busy;$('resume').hidden=busy;$('stop').hidden=!busy;
+  const resumable=state.phase==='stopped'||(state.phase==='error'&&state.metrics?.step!==undefined);
+  const next=busy||resumable||state.phase==='complete'?'':!pair||reviewed||$('confirm').checked?'start':'prepare';
+  $('start').classList.toggle('primary',next==='start');
+  $('prepare').classList.toggle('primary',next==='prepare');
+  $('resume').classList.toggle('primary',resumable);$('resume').classList.toggle('ghost',!resumable);
+  $('confirmation').classList.toggle('attention',reviewed&&!$('confirm').checked);
+}
+function paintPill(){
+  $('pill').dataset.tone=disconnected?'error':lastState?.busy?'busy':'ok';
+  $('pill-text').textContent=t(disconnected?'服务未连接':'本地运行');
+}
+function duration(seconds){
+  if(seconds<90)return english()?`${Math.ceil(seconds)} s`:`${Math.ceil(seconds)} 秒`;
+  const minutes=Math.round(seconds/60);
+  if(minutes<90)return english()?`${minutes} min`:`${minutes} 分钟`;
+  return english()?`${(minutes/60).toFixed(1)} h`:`${(minutes/60).toFixed(1)} 小时`;
+}
+function updateEta(state,step,target){
+  if(state.phase!=='training'||state.stop_requested||!Number.isFinite(step)){samples=[];$('eta').textContent='';return}
+  const now=Date.now();
+  if(!samples.length||samples.at(-1).step!==step)samples.push({time:now,step});
+  samples=samples.slice(-120);
+  const first=samples[0],last=samples.at(-1);
+  const rate=last.time>first.time?(last.step-first.step)/((last.time-first.time)/1000):0;
+  $('eta').textContent=rate>0&&target>step?(english()?`about ${duration((target-step)/rate)} left`:`预计还需 ${duration((target-step)/rate)}`):'';
+}
+
+/* Painting from server state */
+function paint(state){
+  lastState=state;
+  const busy=Boolean(state.busy);
+  $('inputs').disabled=busy;
+  $('stop').disabled=!busy||Boolean(state.stop_requested);
+  document.body.toggleAttribute('data-busy',busy);
+  if(busy&&state.config){
+    for(const[key,value]of Object.entries(state.config)){const input=form.elements.namedItem(key);if(input&&value!==null&&key!=='pairs')input.value=value}
+    setUnit(state.config.epochs==null?'steps':'epochs');
+    if(JSON.stringify(pairValues())!==JSON.stringify(state.config.pairs)){$('pairs').replaceChildren();(state.config.pairs||[]).forEach(pair=>addPair(pair))}
+    $('lr-slider').value=Math.log10(Number(form.elements.lr.value));
+    $('pair-fields').hidden=modeValue()!=='pair';$('dataset-fields').hidden=modeValue()==='pair';
+  }
+  const label=state.stop_requested&&busy?'等待保存进度…':PHASE_NAMES[state.phase]||state.phase;
+  $('status').textContent=t(label);$('status').dataset.tone=state.phase==='error'?'error':'';
+  paintPill();drawSteps();updateActions();
+
+  const metrics=state.metrics||{},count=Number(state.config?.train_samples||metrics.train_samples)||0;
+  if(metrics.step!==undefined){
+    const target=state.config?.steps||100;
+    $('step').textContent=english()?`${metrics.step} / ${target} steps`:`${metrics.step} / ${target} 步`;
+    $('epoch').textContent=count?`${(metrics.step/count).toFixed(2)} / ${(target/count).toFixed(2)}`:'—';
+    $('progress').max=target;$('progress').value=metrics.step;
+    updateEta(state,metrics.step,target);
+  }else updateEta(state);
+  if(metrics.loss!==undefined)$('train-loss').textContent=Number(metrics.loss).toFixed(5);
+  if(metrics.loss_average!==undefined)$('train-average').textContent=(english()?'20-step avg ':'20 步平均 ')+Number(metrics.loss_average).toFixed(5);
+  if(metrics.validation_loss!==undefined)$('loss').textContent=Number(metrics.validation_loss).toFixed(5);
+  if(metrics.best_step!==undefined)$('best').textContent=(english()?'Step ':'第 ')+metrics.best_step+(english()?'':' 步');
+  updateTarget();drawChart(state.history||[]);
+
+  if(state.error||state.warning)showMessage('error',state.error||state.warning);
+  paintLogs(state.logs||[]);paintFiles(state.artifacts||[]);paintReview(state);
+  if(state.audio&&lastAudio!==state.audio){lastAudio=state.audio;play('/api/audio')}
+}
+function paintLogs(lines){
+  const text=lines.join('\n');
+  if(text===lastLogs)return;
+  const logs=$('logs'),follow=logs.scrollHeight-logs.scrollTop-logs.clientHeight<24;
+  logs.textContent=text;lastLogs=text;
+  if(follow)logs.scrollTop=logs.scrollHeight;
+}
+function paintFiles(files){
+  const key=files.join('\n')+uiLanguage;
+  if(key===lastFiles)return;
+  lastFiles=key;
+  $('files-block').hidden=!files.length;
+  $('artifacts').replaceChildren(...files.map(path=>{
+    const item=document.createElement('li'),code=document.createElement('code'),copy=document.createElement('button');
+    code.textContent=path;copy.type='button';copy.className='btn ghost small';copy.textContent=t('复制');
+    copy.onclick=async()=>{try{await navigator.clipboard.writeText(path);copy.textContent=t('已复制');setTimeout(()=>copy.textContent=t('复制'),1200)}catch{}};
+    item.append(code,copy);return item;
+  }));
+}
+function paintReview(state){
+  const p=state.preparation;
+  $('review-block').hidden=!p;
+  if(!p){$('segment-row').hidden=true;syncAudioBlock();return}
+  const figures=english()?[['Training clips',p.train_samples||0],['Validation clips',p.validation_samples||0],['Total length',(p.seconds||0).toFixed(1)+' s']]:[['训练片段',p.train_samples||0],['验证片段',p.validation_samples||0],['总时长',(p.seconds||0).toFixed(1)+' 秒']];
+  $('summary').replaceChildren(...figures.map(([name,value])=>{const box=document.createElement('div'),number=document.createElement('strong');number.textContent=value;box.append(number,name);return box}));
+  const notes=(kind,prefix,list)=>(list||[]).map(text=>{const item=document.createElement('li');item.className=kind;item.textContent=prefix+message(text);return item});
+  $('review').replaceChildren(...notes('error',english()?'Error: ':'错误：',p.errors),...notes('',english()?'Note: ':'提示：',p.warnings));
+  const selected=(p.segments||[]).filter(s=>s.split),key=state.output+uiLanguage,select=$('segments');
+  if(select.dataset.output!==key){
+    const previous=select.value;
+    select.replaceChildren(...selected.map(s=>{
+      const option=document.createElement('option');
+      option.value=s.id;
+      option.textContent=`${s.id} · ${s.start.toFixed(2)}–${s.end.toFixed(2)} ${english()?'s':'秒'} · ${s.split==='train'?(english()?'Training':'训练'):(english()?'Validation':'验证')}`;
+      return option;
+    }));
+    if(selected.some(s=>s.id===previous))select.value=previous;
+    select.dataset.output=key;
+  }
+  $('segment-row').hidden=!selected.length;
+  syncAudioBlock();
+}
+function syncAudioBlock(){$('audio-block').hidden=$('segment-row').hidden&&$('audio').hidden}
+async function play(path,autoplay=false){
+  try{
+    const response=await fetch(path,{headers:{'X-OpenSV-Token':token}});
+    if(!response.ok)throw Error('试听读取失败');
+    const blob=await response.blob();
+    if(audioUrl)URL.revokeObjectURL(audioUrl);
+    audioUrl=URL.createObjectURL(blob);
+    $('audio').src=audioUrl;$('audio').hidden=false;syncAudioBlock();
+    if(autoplay)$('audio').play().catch(()=>{});
+  }catch(error){showMessage('error',error.message)}
+}
+async function start(action){
+  try{
+    showMessage('error','');
+    const result=await api(action,values());
+    for(const id of['epoch','train-loss','loss','best'])$(id).textContent='—';
+    $('step').textContent=$('train-average').textContent='';
+    $('progress').value=0;$('audio').hidden=true;$('segment-row').hidden=true;$('segments').dataset.output='';lastAudio='';samples=[];
+    paint(result);
+  }catch(error){showMessage('error',error.message)}
+}
+
+/* Loss chart: one y axis, a recessive grid, and a crosshair tooltip */
+function niceTicks(low,high,count){
+  const span=high-low||1,step=10**Math.floor(Math.log10(span/count)),error=span/count/step;
+  const size=step*(error>=7.5?10:error>=3.5?5:error>=1.5?2:1),first=Math.ceil(low/size)*size,ticks=[];
+  for(let value=first;value<=high+size*1e-6;value+=size)ticks.push(Number(value.toPrecision(12)));
+  return ticks;
+}
+const chartView={scale:null,history:[]};
+function drawChart(history,force=false){
+  const svg=$('chart'),key=history.length+':'+(history.at(-1)?.step??'')+':'+(history.at(-1)?.loss??'')+':'+uiLanguage+':'+svg.clientWidth;
+  if(!force&&key===chartKey)return;
+  chartKey=key;
+  const width=Math.max(svg.clientWidth,240),height=svg.clientHeight||210;
+  svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+  svg.replaceChildren();
+  const node=(tag,attrs,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;svg.append(el);return el};
+  const all=history.flatMap(p=>[p.loss,p.loss_average,p.validation_loss]).filter(Number.isFinite);
+  chartView.history=history;chartView.scale=null;
+  if(!all.length){node('text',{x:width/2,y:height/2,'text-anchor':'middle',class:'empty-text'},t('开始训练后显示误差曲线'));return}
+  const min=Math.min(...all),max=Math.max(...all),pad=(max-min||Math.max(max*.1,.01))*.06,low=min-pad,high=max+pad;
+  const maxStep=Math.max(1,...history.map(p=>p.step));
+  const left=44,right=width-10,top=8,bottom=height-24;
+  const x=value=>left+value/maxStep*(right-left),y=value=>bottom-(value-low)/(high-low)*(bottom-top);
+  const ticks=niceTicks(low,high,4),digits=Math.max(0,Math.ceil(-Math.log10((ticks[1]-ticks[0])||1)));
+  for(const tick of ticks){
+    node('line',{class:'grid-line',x1:left,x2:right,y1:y(tick),y2:y(tick)});
+    node('text',{class:'axis-text',x:left-6,y:y(tick)+4,'text-anchor':'end'},tick.toFixed(digits));
+  }
+  for(const tick of niceTicks(0,maxStep,width<420?3:5))if(tick===Math.round(tick))node('text',{class:'axis-text',x:x(tick),y:height-6,'text-anchor':tick===0?'start':tick>=maxStep*.97?'end':'middle'},tick);
+  const series=key=>history.filter(p=>Number.isFinite(p[key]));
+  const line=(key,cls)=>{const points=series(key);if(points.length)node('polyline',{class:cls,points:points.map(p=>x(p.step).toFixed(1)+','+y(p[key]).toFixed(1)).join(' ')});return points};
+  line('loss','line-raw');line('loss_average','line-avg');
+  const checkpoints=line('validation_loss','line-val');
+  for(const p of checkpoints)if(checkpoints.length<=40)node('circle',{class:'dot-val',cx:x(p.step),cy:y(p.validation_loss),r:4});
+  chartView.scale={x,y,left,right,top,bottom,maxStep};
+  if(hoverX!==null)showHover(hoverX);
+}
+function hideTooltip(){
+  $('tooltip').hidden=true;
+  for(const el of $('chart').querySelectorAll('.hover'))el.remove();
+}
+let hoverX=null;
+function showHover(px){
+  const{scale,history}=chartView;
+  if(!scale)return;
+  const box=$('chart').getBoundingClientRect();
+  const step=Math.max(0,Math.min(scale.maxStep,(px-scale.left)/(scale.right-scale.left)*scale.maxStep));
+  const nearest=(key)=>{let best=null;for(const p of history)if(Number.isFinite(p[key])&&(!best||Math.abs(p.step-step)<Math.abs(best.step-step)))best=p;return best};
+  const raw=nearest('loss'),average=nearest('loss_average'),check=nearest('validation_loss'),anchor=raw||check;
+  if(!anchor)return;
+  hideTooltip();
+  const svg=$('chart'),make=(tag,attrs)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);el.classList.add('hover');for(const[k,v]of Object.entries(attrs))el.setAttribute(k,v);svg.append(el);return el};
+  const line=make('line',{x1:scale.x(anchor.step),x2:scale.x(anchor.step),y1:scale.top,y2:scale.bottom});line.classList.add('crosshair');
+  if(average){const dot=make('circle',{cx:scale.x(average.step),cy:scale.y(average.loss_average),r:4});dot.classList.add('dot-avg')}
+  const tip=$('tooltip'),rows=[[t('训练误差 · 逐步原值'),raw?.loss],[t('训练误差 · 最近 20 步平均'),average?.loss_average],[t('验证误差 · 检查点')+(check&&check.step!==anchor.step?` @${check.step}`:''),check?.validation_loss]];
+  const title=document.createElement('b');title.textContent=english()?`Step ${anchor.step}`:`第 ${anchor.step} 步`;
+  tip.replaceChildren(title,...rows.filter(row=>Number.isFinite(row[1])).map(([name,value])=>{const row=document.createElement('div'),a=document.createElement('span'),b=document.createElement('span');a.textContent=name;b.textContent=value.toFixed(5);row.append(a,b);return row}));
+  tip.hidden=false;
+  const left=scale.x(anchor.step)+12;
+  tip.style.left=(left+tip.offsetWidth>box.width?Math.max(0,scale.x(anchor.step)-tip.offsetWidth-12):left)+'px';
+}
+$('chart').addEventListener('pointermove',event=>{hoverX=event.clientX-$('chart').getBoundingClientRect().left;showHover(hoverX)});
+$('chart').addEventListener('pointerleave',()=>{hoverX=null;hideTooltip()});
+new ResizeObserver(()=>{hideTooltip();drawChart(chartView.history,true)}).observe($('chart-wrap'));
+
+/* Events */
+form.onsubmit=event=>{event.preventDefault();start('start')};
+$('prepare').onclick=()=>{$('confirm').checked=false;start('prepare')};
+$('resume').onclick=()=>start('resume');
+$('stop').onclick=()=>api('stop',{}).then(paint).catch(error=>showMessage('error',error.message));
+const playSegment=()=>play('/api/audio?segment='+encodeURIComponent($('segments').value),true);
+$('segments').onchange=playSegment;
+$('play-segment').onclick=playSegment;
+$('confirm').onchange=updateActions;
+$('add-pair').onclick=()=>addPair();
+for(const radio of form.elements.mode)radio.onchange=syncMode;
+$('training-unit').onchange=()=>{const unit=$('training-unit').value,count=trainCount();if(count){if(unit==='steps')form.elements.steps.value=Math.ceil(Number(form.elements.epochs.value)*count);else form.elements.epochs.value=Number(form.elements.steps.value)/count}setUnit(unit)};
+form.addEventListener('input',updateTarget);
+form.addEventListener('invalid',event=>{const section=event.target.closest('details');if(section)section.open=true},true);
+$('lr-slider').oninput=()=>form.elements.lr.value=Number((10**Number($('lr-slider').value)).toPrecision(3));
+form.elements.lr.oninput=()=>$('lr-slider').value=Math.log10(Number(form.elements.lr.value));
+$('check-engine').onclick=async()=>{try{showMessage('engine-status','正在检查…');showMessage('engine-status',(await api('engine',{engine:form.elements.engine.value})).message)}catch(error){showMessage('engine-status',error.message)}};
+$('theme').onclick=()=>{
+  const root=document.documentElement,dark=root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme=dark?'light':'dark';storage.set('opensv-theme',root.dataset.theme);
+};
+for(const radio of document.querySelectorAll('[name=ui-language]')){
+  radio.checked=radio.value===uiLanguage;
+  radio.onchange=()=>{
+    uiLanguage=radio.value;storage.set('opensv-language',uiLanguage);
+    localize();numberPairs();
+    for(const el of document.querySelectorAll('[data-message]'))el.textContent=message(el.dataset.message);
+    for(const el of document.querySelectorAll('.help'))el.setAttribute('aria-label',t(el.getAttribute('aria-label')));
+    $('segments').dataset.output='';lastFiles='';drawChart(chartView.history,true);
+    if(lastState)paint(lastState);else{drawSteps();updateTarget()}
+  };
+}
+
+/* Start */
+api('defaults').then(defaults=>{
+  if(!form.elements.engine.value)form.elements.engine.value=defaults.engine;
+  for(const device of['cuda','mps'])form.elements.device.querySelector(`[value=${device}]`).disabled=!defaults[device+'_available'];
+  showMessage('device-status',defaults.mps_available?'CPU 与 Apple GPU（MPS）均可选；声码器与频谱损失使用 CPU。':defaults.cuda_available?'CPU 与 NVIDIA GPU 均可选。':defaults.cuda_reason);
+}).catch(error=>showMessage('device-status',error.message));
+addPair();addHelp(form);setUnit('epochs');localize();syncMode();drawChart([]);
+async function poll(){
+  try{
+    const state=await api('state');
+    if(disconnected){disconnected=false;showMessage('error','')}
+    paint(state);
+  }catch(error){
+    disconnected=true;paintPill();
+    delete $('error').dataset.message;
+    $('error').textContent=(english()?'Service disconnected: ':'服务未连接：')+error.message;
+  }
+  setTimeout(poll,1000);
+}
+poll();
 </script>
+</body>
 </html>
